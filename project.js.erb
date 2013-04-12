@@ -1,0 +1,45 @@
+var project = {
+  name: "<%= project.name %>",
+  desc: <%= { homepage: project.desc }.to_json %>,
+  types: [
+    <% project.types.each_with_index do |type, index| %><% next if type.is_typedef? %>
+      {
+        name:       "<%= type.name %>",
+        file:       "<%= type.declared_in %>",
+        decl:       "<%= type.declared_as %>",
+        namespaces: <%= (type.namespaces project).to_json %>,
+        methods: [
+          <% type.functions.each_with_index do |method, index| %>{
+              name:        "<%= method.name %>",
+              params:      "<%= method.parameters.join ',' %>",
+              attrs:       <%= method.attrs %>,
+              desc:        "<%= method.desc %>",
+              return_type: "<%= if method.return_type[:type].class == String then method.return_type[:type] else method.return_type[:type].name end %>",
+              return_attrs: <%= method.return_type[:attrs] %>,
+              visibility:  "<%= method.visibility %>"<% unless method.documentation.nil? %>,
+              doc:         <%= method.documentation.to_json %><% end %>
+            }<%= ',' if index != type.functions.count - 1 %><% end %>
+        ],
+        attributes: [
+          <% type.attributes.each_with_index do |attribute, index| %>
+          <% object_type = project.find_type attribute.type, (type.namespaces project) %>{
+            name:       "<%= attribute.name %>",
+            type:       "<%= attribute.type %>",
+            <% unless object_type.nil? %>
+            obj_type:   "<%= object_type.name %>",
+            <% end %>
+            attrs:      <%= attribute.attrs %>,
+            visibility: "<%= attribute.visibility %>"<% unless attribute.documentation.nil? %>,
+            doc:         <%= attribute.documentation.to_json %><% end %>
+          }<%= ',' if index != type.attributes.count - 1 %><% end %>
+        ],
+        ancestors: [
+          <% type.ancestors.each_with_index do |ancestor, index| %>
+          {
+            name:       "<%= ancestor[:class] %>",
+            visibility: "<%= ancestor[:visibility] %>"
+          }<%= ',' if index != type.ancestors.count - 1 %><% end %>
+        ]
+      }<%= ',' if index != project.types.size - 1 %><% end %>
+  ]
+//};
