@@ -382,7 +382,7 @@ end
 
 # Generating files from ERB
 
-o_prefix = "foundation-4.1.1.custom"
+o_prefix = "twilidoc"
 i_prefix = File.expand_path (File.dirname __FILE__)
 
 js_template     = ERB.new (File.read "#{i_prefix}/project.js.erb")
