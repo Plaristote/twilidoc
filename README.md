@@ -17,7 +17,7 @@ http://fallout-equestria.googlecode.com/git/doc/blank.html
 
 Howto
 ==
-The ruby script from main.rb harvest data from your code to generate a json file describing your project:
+The ruby script from main.rb harvests data from your code to generate a json file describing your project:
 
     ruby main.rb -i project.yml -o doc
 
@@ -33,7 +33,7 @@ It kinda looks like this:
       <h5>Homepage</h5>
       You're project's homepage.
 
-The includes directories are searched recursively. You can also pair your headers with yml files to describe them:
+The includes directories are searched recursively. You can also pair your headers with yml files to add further informations:
 
     SomeClass:
       methods:
@@ -44,7 +44,7 @@ The includes directories are searched recursively. You can also pair your header
         - name:  'some_attribute'
         - short: 'desc is not mandatory'
         
-The output for the main.rb script is the directory in where you copied the charisma-doc directory.
+The output for the main.rb script is the directory where you have the charisma-doc installed.
 That's all.
 
 Unsupported features
@@ -52,7 +52,3 @@ Unsupported features
 The parser is not yet complete. Here is a list of unsupported C++ features:
 - Templates
 - Enums
-
-Howto
-==
-TODO
