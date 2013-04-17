@@ -34,6 +34,24 @@ module CppParser
           i       = read_directive lines, i
           next
         end
+	@defines.each do |key,value|
+	  parts    = key.split '('
+	  is_macro = parts.size > 1
+	  if is_macro
+	    macro  = parts[0]
+	    params = parts[1..parts.size].join '('
+	    if line =~ macro
+	      puts "Found a macro to use"
+	      exit 0
+	    end
+	  else
+	    old = line.dup
+	    line.gsub! /#{key}/, "#{value}"
+	    if old != line
+	      puts "Line has been modified with macro:\n\t#{old}\n\t#{line}\n\n"
+	    end
+	  end
+	end
         @source  += line + "\n" unless skipping?
         @cur_path = path
         i        += 1
@@ -70,6 +88,7 @@ private
       name  = parts[0]
       value = parts[1..parts.size].join ' '
       @defines[name] = value
+      puts "Found define #{name} -> #{value}"
     end
 
     def directive_undef line
@@ -124,7 +143,6 @@ private
             break
           end
         end
-        puts "/!\\ Not including file #{path}" unless parsed
       end
     end
   end

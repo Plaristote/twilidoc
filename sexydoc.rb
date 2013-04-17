@@ -98,6 +98,9 @@ module SexyDoc
         array   = @klass.send cat
         index   = array.index self
         if not cat_doc.nil? and not index.nil?
+	  if @attr_type == :method
+	    throw @name
+	  end
           @doc  = cat_doc[index]
         end
       end

@@ -1,13 +1,26 @@
 #!/usr/bin/ruby
-
+@active_log = false
 def require_local name
  path  = File.expand_path (File.dirname __FILE__)
  path += "/#{name}.rb"
  require path
 end
 
+require       'optparse'
+
+options = {
+    output: 'doc',
+    input:  'twilidoc.yml'
+  }
+
+OptionParser.new do |opts|
+  opts.banner = "usage: #{ARGV[0]} [options]"
+  opts.on '-o', '--output PATH', 'Set an output'     do |v| options[:output] = v end
+  opts.on '-i', '--input',  'Set input project file' do |v| options[:input]  = v end
+end.parse!
+
 require       'yaml'
-CONF = YAML.load (File.open 'twilidoc.yml')
+CONF = YAML.load (File.open options[:input])
 require       'json'
 require_local 'sexydoc'
 require_local 'preprocessor'
@@ -29,6 +42,7 @@ preprocessor.inc_pathes = CONF['includes']
 
 project_desc = {}
 
+print "Running preprocessor..."
 headers.each     do |header|
   preprocessor.parse header
 end
@@ -36,6 +50,9 @@ descriptors.each do |descriptor|
   yml        = YAML.load (File.open descriptor)
   project_desc.merge! yml
 end
+puts " [Done]"
+
+line_length  = 0
 
 filemap      = preprocessor.filemap
 sample       = preprocessor.source
@@ -60,7 +77,7 @@ end
 def get_namespace declared_at, namespaces
   namespace = nil
   namespaces.each do |block|
-    namespace = block.name if block[:beg] <= declared_at[0] and block[:end] >= declared_at[1]
+    namespace = block[:name] if block[:beg] <= declared_at[0] and block[:end] >= declared_at[1]
   end
   namespace
 end
@@ -108,10 +125,16 @@ while i < code.size
 end
 bar.finish
 
-code.scan /namespace\s+([a-z0-9_]+)\s+{/im do
+code.scan /namespace\s+([a-zA-Z0-9_]+)\s+{/m do
   namespace = $1
   beg       = ($~.offset 1)[0]
   _end      = ($~.offset 1)[1]
+
+  code_sample = code[_end..code.size]
+  inline_code = CppParser.get_block code_sample  
+  
+  _end        = beg + inline_code.size
+  
   father    = get_namespace [ beg, _end ], namespaces
   namespace = "#{father}::#{namespace}" unless father.nil?
   namespaces << { :beg => beg, :end => _end, name: namespace }
@@ -124,8 +147,11 @@ code.scan /(class|struct|union)\s+([a-zA-Z0-9_]+)\s+(:([^{]*))?{/ do
   inheritences = $4
   inline_code  = ''
 
-  10.times do print ' ' end
-  print "\rPARSING CLASS #{class_name}"
+  print "\r"
+  line_length.times do print ' ' end
+  line        = "PARSING CLASS #{class_name}"
+  line_length = line.size
+  print "\r#{line}"
 
   inherits = unless inheritences.nil?
     inheritences = inheritences.split ','
@@ -154,7 +180,6 @@ code.scan /(class|struct|union)\s+([a-zA-Z0-9_]+)\s+(:([^{]*))?{/ do
   namespace = get_namespace [ offset_begin, offset_begin + inline_code.size ], namespaces
   symbol = "#{namespace}::#{symbol}" unless namespace.nil?
   file_arch << { beg: offset_begin, end: offset_begin + inline_code.size, symbol: symbol }
-
   ##
   ## Find containing file
   ##
@@ -194,14 +219,12 @@ code.scan /(class|struct|union)\s+([a-zA-Z0-9_]+)\s+(:([^{]*))?{/ do
 
   project.types << type
 end
-#exit 0
+puts ''
 
 ##
 ## Fetch typedefs
 ##
 code.scan /typedef\s+([^;]+)\s+([^;]+)\s*;/ do
-  puts "Typedef matching: "
-  
   belongs_to  = nil
   file_arch.each do |arch|
     if arch[:beg] < ($~.offset 1)[0] and arch[:end] > ($~.offset 2)[0]
@@ -219,8 +242,6 @@ code.scan /typedef\s+([^;]+)\s+([^;]+)\s*;/ do
   typedef      = SexyDoc::Typedef.new typename, type
   typedef.name = name
 
-  puts "Defined typedef '#{typedef.name}' pointing to #{if type.nil? then typename else type.name end}"
-
   project.types << typedef
 end
 
@@ -228,14 +249,16 @@ end
 ## Fetch functions
 ##
 code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+)\s*(\([^)]*\))/i do
-  puts "matching a function/method"
   return_type = $1
   name        = $4
-  puts "#{return_type} #{name}"
  
   next if return_type.strip == 'new' 
 
-  puts return_type
+  print "\r"
+  line_length.times do print ' ' end
+  line        = "PARSING METHODS #{return_type.strip!} #{name}"
+  line_length = line.size
+  print "\r#{line}"
 
   method      = SexyDoc::Function.new project
   method.name = name
@@ -254,8 +277,9 @@ code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+)\s*(\([^)]*\))/i do
     i += 1
   end
 
-  parameters = $5[1...($5.size - 1)]
-  parameters = parameters.split ','
+  params_offset = $~.offset 5
+  parameters    = sample[params_offset[0]...params_offset[1]]
+  parameters    = parameters.split ','
   parameters.each {|p| p.strip! }
 
   method.parameters = parameters
@@ -280,7 +304,6 @@ code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+)\s*(\([^)]*\))/i do
 
   belongs_to  = nil
   file_arch.each do |arch|
-#   if arch[:beg] < ($~.offset 1)[0] and arch[:end] > ($~.offset 2)[0]
     if arch[:beg] < ($~.offset 1)[0] and arch[:end] >= ($~.offset 1)[0]
       belongs_to = arch[:symbol]
     end
@@ -288,24 +311,18 @@ code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+)\s*(\([^)]*\))/i do
 
   method.visibility = get_visibility ($~.offset 1)[0], visibility_arch
 
-  puts "Searching type for #{method.visibility} method #{method.name}"
-
   type         = nil
   namespaces   = []
   unless belongs_to.nil?
     type       = project.find_type belongs_to
     namespaces = (type.namespaces project) unless type.nil?
-    puts type.name unless type.nil?
-    puts namespaces.inspect
   end
   method.klass = type
   type.functions << method unless type.nil?
 
   typename    = return_type.type
   method.return_type[:attrs] = return_type.attrs
-  puts "Return type name is #{return_type.type}"
   method.return_type[:type]  = project.find_type return_type.type, namespaces
-  puts "Done return type name"
   method.return_type[:type]  = typename if method.return_type[:type].nil?
 
   return_type_spec.each do |type_spec|
@@ -330,6 +347,7 @@ code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+)\s*(\([^)]*\))/i do
     end
   end
 end
+puts ''
 
 ##
 ## Fetch attributes
@@ -382,7 +400,7 @@ end
 
 # Generating files from ERB
 
-o_prefix = "twilidoc"
+o_prefix = options[:output]
 i_prefix = File.expand_path (File.dirname __FILE__)
 
 js_template     = ERB.new (File.read "#{i_prefix}/project.js.erb")
@@ -399,7 +417,7 @@ str += ']'
 typedefs_json = str
 puts "Done Generating Typedef JS"
 
-File.open "#{o_prefix}/js/project.js", 'w' do |f|
+File.open "#{o_prefix}/project.js", 'w' do |f|
   json = js_template.result binding
   json += ",\n  #{typedefs_json}\n};"
   f.write json
