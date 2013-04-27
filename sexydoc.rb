@@ -167,6 +167,7 @@ module SexyDoc
       namespaces << ''
       @types.each do |type|
         namespaces.each do |namespace|
+          next if namespace.nil? or name.nil?
           full_name = if namespace == '' then name else namespace + '::' + name end
           return type if type.name == full_name
         end

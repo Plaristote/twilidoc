@@ -246,17 +246,46 @@ code.scan /typedef\s+([^;]+)\s+([^;]+)\s*;/ do
 end
 
 ##
+## Fetch operator overloads
+##
+overloads = [
+    'operator=',
+    'operator==',
+    'operator!=',
+    'operator<',
+    'operator>',
+    'operator++',
+    'operator--',
+    'operator*',
+    'operator+',
+    'operator-',
+    'operator[]',
+    'operator()',
+    'operator->',
+  ]
+overloads = (overloads.map { |overload| Regexp.quote overload }).join '|'
+
+##
 ## Fetch functions
 ##
-code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+)\s*(\([^)]*\))/i do
+code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+|#{overloads})\s*(\([^)]*\))/i do
   return_type = $1
   name        = $4
- 
+
   next if return_type.strip == 'new' 
+
+  # In some cases the regex fails to find the function's name. In this case it
+  # is stored as a return qualifier. Either fix the regex or keep this block:
+  if name == ' '
+    words       = return_type.split ' '
+    name        = words.last
+    return_type = words[0...words.size - 1].join ' '
+  end
 
   print "\r"
   line_length.times do print ' ' end
-  line        = "PARSING METHODS #{return_type.strip!} #{name}"
+  line        = "PARSING METHODS #{name} -> #{return_type.strip!}"
+
   line_length = line.size
   print "\r#{line}"
 

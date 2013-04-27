@@ -35,6 +35,7 @@ module CppParser
           next
         end
 	@defines.each do |key,value|
+          next
 	  parts    = key.split '('
 	  is_macro = parts.size > 1
 	  if is_macro
