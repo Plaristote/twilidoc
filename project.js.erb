@@ -8,10 +8,11 @@ var project = {
         file:       "<%= type.declared_in %>",
         decl:       "<%= type.declared_as %>",
         namespaces: <%= (type.namespaces project).to_json %>,
+        <% unless type.documentation.nil? %>doc:        <%= { overview: type.documentation['overview'], detail: type.documentation['detail'] }.to_json %>,<% end %>
         methods: [
           <% type.functions.each_with_index do |method, index| %><% next if method.name == 'throw' %>{
               name:        "<%= method.name %>",
-              params:      "<%= (method.parameters.join ',').escape_quotes %>",
+              params:      <%= method.parameters.to_json %>,
               attrs:       <%= method.attrs %>,
               desc:        "<%= method.desc %>",
               return_type: "<%= if method.return_type[:type].class == String then method.return_type[:type] else method.return_type[:type].name end %>",

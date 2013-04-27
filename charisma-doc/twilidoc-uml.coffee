@@ -26,9 +26,9 @@ $(document).ready ->
     height     = 50
 
     if      visibility == 'protected'
-      color = 'lightblue'
+      color = 'lightgreen'
     else if visibility == 'private'
-      color = 'blue'
+      color = 'lightblue'
     for method in type.methods
       str  = visibility_string2uml method
       str += ' ' + method.name + '(' + method.params + ') -> ' + method.return_type

@@ -92,15 +92,12 @@ module SexyDoc
         when :attribute
           'attributes'
         end
-
+        
         doc     = @klass.documentation
         cat_doc = doc[cat] unless doc.nil?
-        array   = @klass.send cat
+        array   = @klass.send (@attr_type == :method ? 'functions' : 'attributes')
         index   = array.index self
         if not cat_doc.nil? and not index.nil?
-	  if @attr_type == :method
-	    throw @name
-	  end
           @doc  = cat_doc[index]
         end
       end
