@@ -104,26 +104,56 @@ end
 ## 'sample' will be the original code.
 ## 'code'   will be the code with wiped out commentaries and string
 ##
-require 'ruby-progressbar'
+#require 'ruby-progressbar'
+class ProgressBarStub
+  def increment
+  end
+  def finish
+  end
+end
 
 i    = 0
 code = sample.dup
-bar  = ProgressBar.create title: 'Wiping out commentaries and strings', total: (code.size + 1)
-while i < code.size
-  p = CppParser.handle_skip code, i
-  if p != i
-    ii = i
-    while ii <= p
-      code[ii] = '#'
-      ii += 1
+#bar  = ProgressBar.create title: 'Wiping out commentaries and strings', total: (code.size + 1)
+bar  = ProgressBarStub.new
+
+n_parts   = code.size / 20000
+part_size = code.size / n_parts
+parts     = []
+n_parts.times do
+  parts << (code[part_size * parts.size...part_size])
+end
+
+puts '-> Wiping out commentaires and string'
+thread_pool = []
+parts.each do |part|
+  thread = Thread.new do
+    li = 0
+    while li < part.size
+      p = CppParser.handle_skip part, li
+      if p != li
+        ii = li
+        while ii <= p
+          part[ii] = '#'
+          ii += 1
+        end
+        ((p - 1) / n_parts).times { bar.increment }
+        li = p
+      end
+      bar.increment
+      li += 1
     end
-    (p - i).times { bar.increment }
-    i = p
   end
-  bar.increment
-  i += 1
+  thread_pool << thread
+end
+
+thread_pool.each do |thread|
+  thread.join
 end
 bar.finish
+
+code = parts.join
+puts '--> Done'
 
 code.scan /namespace\s+([a-zA-Z0-9_]+)\s+{/m do
   namespace = $1
@@ -131,7 +161,7 @@ code.scan /namespace\s+([a-zA-Z0-9_]+)\s+{/m do
   _end      = ($~.offset 1)[1]
 
   code_sample = code[_end..code.size]
-  inline_code = CppParser.get_block code_sample  
+  inline_code = CppParser.get_filtered_block code_sample  
   
   _end        = beg + inline_code.size
   
