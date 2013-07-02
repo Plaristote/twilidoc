@@ -121,7 +121,8 @@ n_parts   = code.size / 20000
 part_size = code.size / n_parts
 parts     = []
 n_parts.times do
-  parts << (code[part_size * parts.size...part_size])
+  parts << code[0...part_size + 1]
+  code = code[part_size + 1..code.size]
 end
 
 puts '-> Wiping out commentaires and string'
@@ -150,9 +151,11 @@ end
 thread_pool.each do |thread|
   thread.join
 end
+i = 0
 bar.finish
 
 code = parts.join
+
 puts '--> Done'
 
 code.scan /namespace\s+([a-zA-Z0-9_]+)\s+{/m do
@@ -161,13 +164,14 @@ code.scan /namespace\s+([a-zA-Z0-9_]+)\s+{/m do
   _end      = ($~.offset 1)[1]
 
   code_sample = code[_end..code.size]
-  inline_code = CppParser.get_filtered_block code_sample  
+  inline_code = CppParser.get_block code_sample  
   
-  _end        = beg + inline_code.size
-  
+  _end        = _end + inline_code.size
+
   father    = get_namespace [ beg, _end ], namespaces
   namespace = "#{father}::#{namespace}" unless father.nil?
   namespaces << { :beg => beg, :end => _end, name: namespace }
+  puts namespaces.last.inspect if namespace == 'AngelScript'
 end
 
 code.scan /(class|struct|union)\s+([a-zA-Z0-9_]+)\s+(:([^{]*))?{/ do
@@ -299,115 +303,118 @@ overloads = (overloads.map { |overload| Regexp.quote overload }).join '|'
 ##
 ## Fetch functions
 ##
-code.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+|#{overloads})\s*(\([^)]*\))/i do
-  return_type = $1
-  name        = $4
+file_arch.each do |class_scope|
+  puts class_scope.inspect
 
-  next if return_type.strip == 'new' 
+  scope           = code[class_scope[:beg]..class_scope[:end] + 1]
+  untainted_scope = sample[class_scope[:beg]..class_scope[:end] + 1]
+  puts 'Fetching methods for class: #{class_scope[:symbol]}'
+  #puts scope
 
-  # In some cases the regex fails to find the function's name. In this case it
-  # is stored as a return qualifier. Either fix the regex or keep this block:
-  if name == ' '
-    words       = return_type.split ' '
-    name        = words.last
-    return_type = words[0...words.size - 1].join ' '
-  end
+  puts sample[class_scope[:beg]..class_scope[:end] + 1]
+  puts ""
+  puts ""
 
-  print "\r"
-  line_length.times do print ' ' end
-  line        = "PARSING METHODS #{name} -> #{return_type.strip!}"
 
-  line_length = line.size
-  print "\r#{line}"
+  scope.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+|#{overloads})\s*(\([^)]*\))/i do
+    return_type = $1
+    name        = $4
 
-  method      = SexyDoc::Function.new project
-  method.name = name
+    next if return_type.strip == 'new' 
 
-  end_offset  =  $~.offset 5
-  i           = end_offset[1]
-  while i < code.size
-    method.attrs |= SexyDoc::ATTR_CONST if code[i..(i + 'const'.size - 1)] == 'const'
-    break if code[i] == ';'
-    if code[i] == '{'
-      code_begin  = i
-      method.code = CppParser.get_block sample[i..sample.size]
-      func_scopes << { beg: i, end: i + method.code.size, method: method }
-      break
+    # In some cases the regex fails to find the function's name. In this case it
+    # is stored as a return qualifier. Either fix the regex or keep this block:
+    if name == ' '
+      words       = return_type.split ' '
+      name        = words.last
+      return_type = words[0...words.size - 1].join ' '
     end
-    i += 1
-  end
 
-  params_offset = $~.offset 5
-  parameters    = sample[params_offset[0]...params_offset[1]]
-  parameters    = parameters.split ','
-  parameters.each {|p| p.strip! }
+    puts "-> #{class_scope[:symbol]}::#{name}"
 
-  method.parameters = parameters
+    method      = SexyDoc::Function.new project
+    method.name = name
 
-  return_type_spec = []
-  type_specs = return_type.split ' '
-  type_specs.each do |type_spec|
-    case type_spec
-    when 'inline'
-      method.attrs |= SexyDoc::ATTR_INLINE
-    when 'static'
-      method.attrs |= SexyDoc::ATTR_STATIC
-    when 'virtual'
-      method.attrs |= SexyDoc::ATTR_VIRTUAL
-    else
-      return_type_spec << type_spec
-    end
-  end
-
-  return_type = CppParser.attribute_from_type type_specs
-  next if return_type.nil? # Is not a real function call
-
-  belongs_to  = nil
-  file_arch.each do |arch|
-    if arch[:beg] < ($~.offset 1)[0] and arch[:end] >= ($~.offset 1)[0]
-      belongs_to = arch[:symbol]
-    end
-  end
-
-  method.visibility = get_visibility ($~.offset 1)[0], visibility_arch
-
-  type         = nil
-  namespaces   = []
-  unless belongs_to.nil?
-    type       = project.find_type belongs_to
-    namespaces = (type.namespaces project) unless type.nil?
-  end
-  method.klass = type
-  type.functions << method unless type.nil?
-
-  typename    = return_type.type
-  method.return_type[:attrs] = return_type.attrs
-  method.return_type[:type]  = project.find_type return_type.type, namespaces
-  method.return_type[:type]  = typename if method.return_type[:type].nil?
-
-  return_type_spec.each do |type_spec|
-    case type_spec
-    when 'const'
-      method.return_type[:attrs] |= SexyDoc::ATTR_CONST
-    when 'unsigned'
-      method.return_type[:attrs] |= SexyDoc::ATTR_UNSIGNED
-    else
-      type      = type_spec
-      last_char = type[type.size - 1]
-      if last_char == '*' or last_char == '&'
-        type    = type[0...(type.size - 1)]
-        if last_char == '*'
-          method.return_type[:attrs] |= SexyDoc::ATTR_PTR
-        elsif last_char == '&'
-          method.return_type[:attrs] |= SexyDoc::ATTR_REF
-        end
+    end_offset  =  $~.offset 5
+    i           = end_offset[1]
+    while i < code.size
+      method.attrs |= SexyDoc::ATTR_CONST if scope[i..(i + 'const'.size - 1)] == 'const'
+      break if scope[i] == ';'
+      if scope[i] == '{'
+        code_begin  = i
+        method.code = CppParser.get_block untainted_scope[i..untainted_scope.size]
+        func_scopes << { beg: i, end: i + method.code.size, method: method }
+        break
       end
-      type = project.find_type type, namespaces
-      method.return_type[:type] = type unless type.nil?
+      i += 1
+    end
+
+    params_offset = $~.offset 5
+    parameters    = untainted_scope[params_offset[0]...params_offset[1]]
+    parameters    = parameters.split ','
+    parameters.each {|p| p.strip! }
+
+    method.parameters = parameters
+
+    return_type_spec = []
+    type_specs = return_type.split ' '
+    type_specs.each do |type_spec|
+      case type_spec
+      when 'inline'
+        method.attrs |= SexyDoc::ATTR_INLINE
+      when 'static'
+        method.attrs |= SexyDoc::ATTR_STATIC
+      when 'virtual'
+        method.attrs |= SexyDoc::ATTR_VIRTUAL
+      else
+        return_type_spec << type_spec
+      end
+    end
+
+    return_type = CppParser.attribute_from_type type_specs
+    next if return_type.nil? # Is not a real function call
+
+    belongs_to = class_scope[:symbol]
+
+    method.visibility = get_visibility (($~.offset 1)[0] + class_scope[:beg]), visibility_arch
+
+    type         = nil
+    namespaces   = []
+    unless belongs_to.nil?
+      type       = project.find_type belongs_to
+      namespaces = (type.namespaces project) unless type.nil?
+    end
+    method.klass = type
+    type.functions << method unless type.nil?
+
+    typename    = return_type.type
+    method.return_type[:attrs] = return_type.attrs
+    method.return_type[:type]  = project.find_type return_type.type, namespaces
+    method.return_type[:type]  = typename if method.return_type[:type].nil?
+
+    return_type_spec.each do |type_spec|
+      case type_spec
+      when 'const'
+        method.return_type[:attrs] |= SexyDoc::ATTR_CONST
+      when 'unsigned'
+        method.return_type[:attrs] |= SexyDoc::ATTR_UNSIGNED
+      else
+        type      = type_spec
+        last_char = type[type.size - 1]
+        if last_char == '*' or last_char == '&'
+          type    = type[0...(type.size - 1)]
+          if last_char == '*'
+            method.return_type[:attrs] |= SexyDoc::ATTR_PTR
+          elsif last_char == '&'
+            method.return_type[:attrs] |= SexyDoc::ATTR_REF
+          end
+        end
+        type = project.find_type type, namespaces
+        method.return_type[:type] = type unless type.nil?
+      end
     end
   end
 end
-puts ''
 
 ##
 ## Fetch attributes
