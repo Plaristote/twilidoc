@@ -1,6 +1,9 @@
 Twilidoc
 ========
 
+THIS PROJECT IS STILL UNDER DEVELOPMENT.
+Some features are not yet complete (see at the end of this document).
+
 Twilidoc is a documentatin generator for C++. It has two major objectives:
 - Non-intrusive documentation: I do not need nor do I like having comments in my headers. They only get harder to read.
 - Easy, pretty and dynamic web interface
@@ -25,7 +28,7 @@ The input file project.yml contains some configuration values about where to fin
 about your project.
 It kinda looks like this:
 
-    name: "You're project's name"
+    name: "Your project's name"
     includes:
       - "include_directory"
       - "other_directory"
@@ -52,3 +55,6 @@ Unsupported features
 The parser is not yet complete. Here is a list of unsupported C++ features:
 - Templates
 - Enums
+
+There is also not yet a way to properly identify methods and attributes in the description, it is for now required to
+describe them in the right order.
