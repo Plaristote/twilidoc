@@ -167,7 +167,8 @@ code.scan /(class|struct|union)\s+([a-zA-Z0-9_]+)\s+(:([^{]*))?{/ do
 
   offset_begin = if $4.nil? then $~.offset 2 else $~.offset 4 end[1]
   code_sample  = sample[offset_begin..sample.size]
-  inline_code  = CppParser.get_block code_sample
+  #inline_code  = CppParser.get_block code_sample
+  inline_code  = CppParser.get_filtered_block code_sample
 
   # Since this procedure is supposed to find class in the right order,
   # we should not have to check for which is the deepest file_arch match:
@@ -190,14 +191,14 @@ code.scan /(class|struct|union)\s+([a-zA-Z0-9_]+)\s+(:([^{]*))?{/ do
   ##
   visibility_it      = offset_begin
   visibility_current = if decl_type == 'class' then 'private' else 'public' end
-  i                  = offset_begin
-  while i < (offset_begin + inline_code.size)
+  i                  = 0
+  while i < inline_code.size
     tocheck = [ 'public', 'protected', 'private' ]
     tocheck.each do |visib|
-      if code[i..i + visib.size] == visib + ':'
-	visibility_arch << { beg: visibility_it, end: i, visibility: visibility_current }
+      if inline_code[i..i + visib.size] == visib + ':'
+	visibility_arch << { beg: visibility_it, end: offset_begin + i, visibility: visibility_current }
 	visibility_current = visib
-	visibility_it      = i + visib.size
+	visibility_it      = offset_begin + i + visib.size
 	i                 += visib.size
 	break
       end

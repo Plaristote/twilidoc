@@ -21,7 +21,7 @@ module SexyDoc
     end
     
     def method_missing method, *args, &block
-      if @pointer-to.nil?
+      if @pointer_to.nil?
 	super
       else
         @pointer_to.send method, args, block

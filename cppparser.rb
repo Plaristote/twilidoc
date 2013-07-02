@@ -43,6 +43,33 @@ module CppParser
     code_sample[found_first...i]
   end
 
+  def self.get_single_block code_sample
+    output          = String.new
+    i               = 0
+    opened_brackets = 0
+    while i < code_sample.size
+      old_i = i
+      i     = handle_skip code_sample, i
+      (i - old_i).times { output += ' ' }
+      if code_sample[i] == '{'
+        opened_brackets += 1
+      elsif code_sample[i] == '}'
+        opened_brackets -= 1
+      end
+      output += if opened_brackets > 0
+        ' '
+      else
+        code_sample[i]
+      end
+      i += 1
+    end
+    output
+  end
+
+  def self.get_filtered_block code_sample
+    get_single_block (get_block code_sample)
+  end
+
   def self.attribute_from_type words, i = 0
     attribute = SexyDoc::Attribute.new
     words.each do |type_spec|
