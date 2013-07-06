@@ -173,7 +173,7 @@ class Attribute
     html       += "</p>" unless name_only == true
     html
     
-  Attribufy: (html) ->
+  Attribufy: (html, classname) ->
     html.replace /\[(((const|unsigned)\s*)*([a-z0-9_]+(::)?)*)\]/ig, (match, content, offset, s) ->
       attrs = 0
       while (content.match /^(const|unsigned)\s/)?
@@ -185,11 +185,14 @@ class Attribute
           attrs  |= ATTR_UNSIGNED
         else
           break
-      type = Project::GetType content, null
-      html = Attribute::TypeBox content, attrs, type, false, true
-      html = html.replace '<button', '<a'
-      html = html.replace 'button>', 'a>'
-      html
+      type = Project::GetType content, classname
+      if type?
+        html = Attribute::TypeBox content, attrs, type, false, true
+        html = html.replace '<button', '<a'
+        html = html.replace 'button>', 'a>'
+        html
+      else
+        match
 
 ##
 ## Single Element View
@@ -270,7 +273,7 @@ class Member extends View
       '(' + match
     params = params.replace /,\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)(\s*|,|)/ig, (match, content, offset, s) ->
       ", [#{content}]"
-    params = Attribute::Attribufy params
+    params = Attribute::Attribufy params, classname
 
     html += "</span>"
     html += "<div class='span9'>"
@@ -337,7 +340,40 @@ class Member extends View
     doc       = doc.replace '<pre>', '<pre class="sh_cpp">'
     doc       = Attribute::Attribufy doc
     if has_doc then doc else ''
-    
+
+##
+## Namespace Widget
+##
+class Namespace extends View
+  constructor: (namespace) ->
+    @view_type = 'namespace'
+    types      = []
+    for type in project.types
+      continue unless type.name?
+      if type.name == namespace
+        @namespace = type
+        continue
+      regexp   = new RegExp "^#{namespace}::"
+      if (type.name.match regexp)?
+       types.push type
+    unless @namespace?
+      alert "Namespace #{namespace} not found."
+      throw "Namespace #{namespace} not found."
+
+    html      = Widget::Begin "#{@namespace.decl} #{@namespace.name}", 'icon-list-alt'
+    for member in types
+      url     = "#go-to-class-#{member.name}"
+      html   += "<div class='span2>#{member.decl}</div>"
+      html   += "<div class='span10'> <button class='btn btn-success btn-mini' data-route='#{url}'>#{member.name}</button></div>"
+      if member.doc? and member.doc.overview?
+        html += '<div class="well foldable" style="padding: 0 0 0 0; margin: 0 0 0 0; padding-left: 5px;">'
+        html += member.doc.overview
+        html += '</div>'
+      html   += '<br/>'
+    html     += Widget::End()
+    html      = Attribute::Attribufy html, @namespace.name
+    @elem     = $(html)
+ 
 ##
 ## Class Widget
 ##
@@ -562,6 +598,9 @@ class Breadcrumb
   PrefabNamespaces: () ->
     @Clear().Add('Project').Add('Namespaces', '#namespaces-index')
 
+  PrefabNamespace: (namespace) ->
+    @PrefabNamespaces().Add('Namespace').Add(namespace, "#show-namespace-#{namespace}")
+
   PrefabClasses: () ->
     @Clear().Add('Project').Add('Class List', '#class-index')
     
@@ -702,6 +741,19 @@ $(document).ready ->
       window.namespaces_list = new ClassList [ 'namespace' ]
     window.namespaces_list.Display()
     window.breadcrumb.PrefabNamespaces()
+
+  window.anchor_handle.AddRoute /#show-namespace-[^-]+$/, ->
+    matches = /#show-namespace-([^-]+)$/.exec window.anchor_handle.anchor
+    namespace_view = new Namespace matches[1]
+    namespace_view.Display()
+    window.breadcrumb.PrefabNamespace(matches[1])
+
+  window.anchor_handle.AddRoute /#go-to-class-[^-]+$/, ->
+    matches = /#go-to-class-([^-]+)$/.exec window.anchor_handle.anchor
+    class_view = new Class matches[1]
+    class_view.Display()
+    window.breadcrumb.Add('Class')
+    window.breadcrumb.Add(matches[1], "show-class-#{matches[1]}")
 
   window.anchor_handle.AddRoute /#show-class-[^-]+$/, ->
     matches = /#show-class-([^-]+)$/.exec window.anchor_handle.anchor
