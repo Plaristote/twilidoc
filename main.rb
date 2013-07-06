@@ -15,12 +15,16 @@ OptionParser.new do |opts|
   opts.on '-i', '--input PATH',  'Set input project file' do |v| options[:input]  = v end
   opts.on '-s', '--source PATH', 'Use already compiled headers instead of compiling them' do |v| options[:source] = v end
   opts.on '-c', '--compile PATH', 'Output the compiled headers in a file' do |v| options[:compile_output] = v end
+  opts.on '-d', '--debug', 'Enable the debug output' do |v| @active_log = true end
 end.parse!
+
+ACTIVE_LOG = @active_log
 
 require 'yaml'
 CONF = YAML.load (File.open options[:input])
 require 'json'
 require 'twilidoc_string'
+require 'twilidoc_shell'
 require 'preprocessor'
 require 'parse'
 
@@ -35,6 +39,8 @@ CONF['includes'].each do |path|
   descriptors += dot_yml
 end
 
+twilart
+
 print "Loading documentation..."
 project_desc = {}
 
@@ -42,7 +48,7 @@ descriptors.each do |descriptor|
   yml        = YAML.load (File.open descriptor)
   project_desc.merge! yml
 end
-puts " [Done]"
+shell_color :green do puts "\t[Done]" end
 
 sample = if options[:source].nil?
 
@@ -53,7 +59,7 @@ sample = if options[:source].nil?
   headers.each     do |header|
     preprocessor.parse header
   end
-  puts " [Done]"
+  shell_color :green do puts "   \t[Done]" end
 
   line_length  = 0
 
@@ -69,21 +75,24 @@ else
   File.read options[:source]
 end
 
+exit 0 unless options[:compile_output].nil?
+
 print "Running cpp probe..."
 global_scope = ClassParser::Object.new
 fuente       = ClassParser.new sample
 fuente.probe global_scope
-puts " [Done]"
+shell_color :green do puts "    \t[Done]" end
 
 json = String.new
 
 def document_objects global_scope, doc
+  print "Matching doc with code..."
+  match_failures = []
   doc.each do |key,value|
     object     = global_scope.solve_type key
 
     if object.nil?
-      puts "Cannot solve type #{key}\n"
-      #$stderr.print "Cannot solve type #{key}\n"
+      match_failures << "Cannot solve type #{key}\n"
       next
     end
 
@@ -100,6 +109,16 @@ def document_objects global_scope, doc
       object.attributes[i][:item].doc = value['attributes'][i]
       i += 1
     end unless value['attributes'].nil?
+  end
+  if match_failures.size == 0
+    shell_color :green do puts "\t[Done]" end
+  else
+    percentage_success = match_failures.size.to_f / doc.keys.count * 100
+    shell_color :red do puts "\t[Failure: #{percentage_success.round 2}% of the symbols were not matched]"
+      match_failures.each do |failure|
+        puts "-> #{failure}"
+      end
+    end
   end
 end
 
@@ -196,6 +215,7 @@ def jsonify_object object, namespaces, json = nil
   json
 end
 
+global_scope.type = :namespace
 global_scope.merge_namespaces
 document_objects global_scope, project_desc
 

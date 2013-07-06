@@ -34,9 +34,6 @@ class ClassParser
       i = 0
       while i < objects.size
         if objects[i][:item].type == :namespace
-
-          # Looking for similar namespaces
-
           ii = i + 1
           while ii < objects.size
             if (objects[ii][:item].type == :namespace) and (objects[ii][:item].name == objects[i][:item].name)
@@ -47,9 +44,7 @@ class ClassParser
             end
             ii += 1
           end
-
         end
-
         objects[i][:item].merge_namespaces
         i += 1
       end
@@ -187,7 +182,6 @@ class ClassParser
       end
 
       is_specialization     = false
-      puts @words[0]
       to_check = if @words[0] =~ /^(class|struct)/
         @words
       else
@@ -287,12 +281,10 @@ class ClassParser
     until end_reached?
 
       if @code[@it] == ';'
-        puts @expression.words.inspect rescue nil
         @expression = nil
         @it        += 1
       elsif @code[@it] == '{'
         skip_scope
-        puts @expression.words.inspect rescue nil
         @expression = nil
         @it        += 1
         next
@@ -394,10 +386,12 @@ class ClassParser
   def probe object = nil
     visibility = :public
     visibility = :private if (not object.nil?) and object.type == :class
+    puts 'Probing for expressions and scopes for object' + (if object.nil? then 'global scope' else object.name end) if ACTIVE_LOG == true
     until end_reached?
       next_word
       get_word
     end
+    puts 'Finish probind for expressions and scopes' if ACTIVE_LOG == true
     @expressions.each do |expression|
       item = expression.evaluate visibility
       if item.first.class == Object

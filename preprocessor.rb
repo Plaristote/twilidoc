@@ -51,10 +51,8 @@ module CppParser
       begin
         epured_line = make_epured_line line
         match       = false
-#        puts variables.inspect
         variables.each do |key,value|
           epured_line.scan /([^a-z0-9_])#{key}([^a-z0-9_])/ do
-#            puts "Solving variable #{key}"
             bpos = ($~.offset 1)[1]
             epos = ($~.offset 2)[0]
             if epured_line[bpos] == '#'
@@ -72,7 +70,6 @@ module CppParser
           end
         end
       end while match == true
-#      puts 'Solved defines'
       line
     end
 
@@ -105,7 +102,7 @@ module CppParser
               break if line[iii - 1] == ')'
             end
 
-            puts ('Solving macro ' + key + " with parameters #{params.inspect}, p_names was #{p_names.inspect}")
+            puts ('Solving macro ' + key + " with parameters #{params.inspect}, p_names was #{p_names.inspect}") if  ACTIVE_LOG == true
 
             line      = line.emplace value[:value], bpos[1], iii
             line      = solve_variables params, line
@@ -124,7 +121,7 @@ module CppParser
     end
 
     def parse file
-      puts '[Preprocessor] Evaluating "' + file + '"'
+      puts '[Preprocessor] Evaluating "' + file + '"' if  ACTIVE_LOG == true
       path        = (File.expand_path file).split '/'
       path        = path[0...path.size - 1].join '/'
       @cur_path   = path
@@ -183,14 +180,14 @@ private
         name  = parts[0]
         value = parts[1..parts.size].join ' '
         @defines[name] = value
-        puts "Found define #{name} -> #{value}"
+        puts "Found define #{name} -> #{value}" if ACTIVE_LOG == true
       else
         results = results.first
         name    = results[0]
         params  = results[1]
         value   = results[3]
         @macros[name] = { value: value, params: params }
-        puts "Found macro #{name} -> #{value.gsub /\s+/, ' '}"
+        puts "Found macro #{name} -> #{value.gsub /\s+/, ' '}" if ACTIVE_LOG == true
       end
     end
 
