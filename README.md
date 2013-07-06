@@ -62,7 +62,7 @@ probe. You may save the headers using the option `--compile`, or `-c`:
 Then, if you update the documentation without having changed any headers, you can skip the preprocessor by
 using the option `--source`, or `-s`:
 
-    ruby main.rb -i project.yml -o doc .s preprocessed_headers.hpp
+    ruby main.rb -i project.yml -o doc -s preprocessed_headers.hpp
 
 Further Documentation
 ==
@@ -71,9 +71,10 @@ You also have the possibility to write further documentation about a class by wr
 They will be appended to the documentation of the object you wish to document.
 
 Everytime an object is loaded, Twilidoc will look for a 'docs/classname.html' file. For instance if your
-class is name `MyNamespace::MyClass`, Twilidoc will try to load `docs/MyNamespace::MyClass.html`.
+class is named `MyNamespace::MyClass`, Twilidoc will try to load `docs/MyNamespace::MyClass.html`.
 
-You may also use this feature to write samples of C++ code, which will get syntax coloration from filters.
+You may also use this feature to write samples of C++ code, which will automatically be provided with syntax
+coloration.
 Also note that writing `[MyNamespace::MyClass]` will create a link to the class' documentation.
 
 Caveats
