@@ -6,7 +6,8 @@ require 'optparse'
 
 options = {
     output: 'doc',
-    input:  'twilidoc.yml'
+    input:  'twilidoc.yml',
+    twilart: true
   }
 
 OptionParser.new do |opts|
@@ -16,6 +17,7 @@ OptionParser.new do |opts|
   opts.on '-s', '--source PATH', 'Use already compiled headers instead of compiling them' do |v| options[:source] = v end
   opts.on '-c', '--compile PATH', 'Output the compiled headers in a file' do |v| options[:compile_output] = v end
   opts.on '-d', '--debug', 'Enable the debug output' do |v| @active_log = true end
+  opts.on '-t', '--no-twilart', 'Disable the twilart' do |v| options[:twilart] = false end
 end.parse!
 
 ACTIVE_LOG = @active_log
@@ -39,7 +41,7 @@ CONF['includes'].each do |path|
   descriptors += dot_yml
 end
 
-twilart
+twilart if options[:twilart]
 
 print "Loading documentation..."
 project_desc = {}
