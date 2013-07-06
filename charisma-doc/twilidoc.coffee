@@ -148,9 +148,9 @@ class Widget
     "</div></div></div>"
 
 class Attribute
-  TypeBox: (name, attrs, type, is_typedef) ->
+  TypeBox: (name, attrs, type, is_typedef, name_only) ->
     html  = ''
-    html += "<p class='btn-group'>"
+    html += "<p class='btn-group'>" unless name_only == true
     html +=   "<button class='btn btn-mini btn-info'>ptr</button>" if (attrs & ATTR_PTR)
     html +=   "<button class='btn btn-mini btn-info'>ref</button>" if (attrs & ATTR_REF)
     html +=   "<button class='btn btn-mini'>const</button>"        if (attrs & ATTR_CONST)
@@ -170,13 +170,26 @@ class Attribute
       html += ">#{name}</button>"
     else
       html     += "<button class='btn btn-mini btn-inverse'>#{name}</button>"
-    html       += "</p>"
+    html       += "</p>" unless name_only == true
     html
     
   Attribufy: (html) ->
-    html.replace /\[([a-z0-9_]+)\]/ig, (match, content, offset, s) ->
+    html.replace /\[(((const|unsigned)\s*)*([a-z0-9_]+(::)?)*)\]/ig, (match, content, offset, s) ->
+      attrs = 0
+      while (content.match /^(const|unsigned)\s/)?
+        if (content.substring 0, 5) == 'const'
+          content = content.substring 6, content.length
+          attrs  |= ATTR_CONST
+        else if (content.substring 0, 8) == 'unsigned'
+          content = content.substring 9, content.length
+          attrs  |= ATTR_UNSIGNED
+        else
+          break
       type = Project::GetType content, null
-      Attribute::TypeBox content, 0, type, false
+      html = Attribute::TypeBox content, attrs, type, false, true
+      html = html.replace '<button', '<a'
+      html = html.replace 'button>', 'a>'
+      html
 
 ##
 ## Single Element View
@@ -250,11 +263,19 @@ class Member extends View
     if method.attrs & ATTR_VIRTUAL
       visibility = '<span class="label label-inverse"><i class="icon-random"></i> Virtual</span> ' + visibility
 
-    params = escape_html method.params
+    params = method.params
+    params = params.replace /^\(\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)/ig, (match, content, offset, s) ->
+      match    = match.replace '(', '['
+      match   += ']'
+      '(' + match
+    params = params.replace /,\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)(\s*|,|)/ig, (match, content, offset, s) ->
+      ", [#{content}]"
+    params = Attribute::Attribufy params
+
     html += "</span>"
     html += "<div class='span9'>"
-    html +=   "<span class='span3'><h4>" + method.name + "</h4></span>"
-    html +=   "<span class='span6'><pre>" + params + "</pre></span>"
+    html +=   "<span class='span3'><h4 class='method-name'>" + method.name + "</h4></span>"
+    html +=   "<span class='span6'><div class='box box-params'>" + params + "</div></span>"
     html +=   "<span class='span3'><div style='float:right;'>#{visibility}</div></span>"
     html += "</div>"
     html += @RenderDoc method if method.doc?
@@ -314,6 +335,7 @@ class Member extends View
       has_doc = true
     doc      += '</dl></div>'
     doc       = doc.replace '<pre>', '<pre class="sh_cpp">'
+    doc       = Attribute::Attribufy doc
     if has_doc then doc else ''
     
 ##
@@ -359,7 +381,7 @@ class Class extends View
         async:     false,
         success: (data) ->
           html += Widget::Begin "Documentation", "icon-file"
-          html += data
+          html += Attribute::Attribufy data
           html += Widget::End()
       }
 
@@ -374,9 +396,11 @@ class Class extends View
 ## Class List Widget
 ##
 class ClassList extends View
-  constructor: () ->
-    html  = Widget::Begin "Class Index (#{project.types.length} classes)", 'icon-list'
-    html += "<table class='table table-striped table-bordered bootstrap-datatable datatable dataTable' id='DataTables_Table_0' aria-describedby='DataTables_Table_0_info'>"
+  constructor: (object_types) ->
+    object_types = [ 'class', 'struct' ] unless object_types?
+    title = if object_types.Includes 'class' then 'Class Index' else 'Namespace Index'
+    html  = Widget::Begin title, 'icon-list'
+    html += "<table class='table table-striped table-bordered bootstrap-datatable datatable dataTable'>"
     html += "<thead>"
     html +=   "<tr role='row'>"
     html +=     "<th>File</th>"
@@ -388,6 +412,7 @@ class ClassList extends View
     html += "<tbody role='alert' aria-live='polite' aria-relevant='all'>"
     i     = 0
     for type in project.types
+      continue unless object_types.Includes type.decl
       html += "<tr class='#{i % 2 == 0 ? 'even' : 'odd'}'>"
       html +=   "<td>#{type.file}</td>"
       html +=   "<td>#{type.name}</td>"
@@ -399,7 +424,7 @@ class ClassList extends View
           type.doc.overview
       html +=   "</td>"
       html +=   "<td>"
-      html +=     "<a class='btn btn-success' href='#show-class-#{type.name}'>"
+      html +=     "<a class='btn btn-success' href='#show-#{object_types[0]}-#{type.name}'>"
       html +=       "<i class='icon-zoom-in icon-white' /> View"
       html +=     "</a>"
       if type.doc? and type.doc.overview != ''
@@ -533,7 +558,10 @@ class Breadcrumb
     html += "</li>"
     @dom.append html
     this
-    
+
+  PrefabNamespaces: () ->
+    @Clear().Add('Project').Add('Namespaces', '#namespaces-index')
+
   PrefabClasses: () ->
     @Clear().Add('Project').Add('Class List', '#class-index')
     
@@ -668,6 +696,12 @@ $(document).ready ->
       window.class_list = new ClassList()
     window.class_list.Display()
     window.breadcrumb.PrefabClasses()
+
+  window.anchor_handle.AddRoute /#namespaces-index/, ->
+    unless window.namespaces_list?
+      window.namespaces_list = new ClassList [ 'namespace' ]
+    window.namespaces_list.Display()
+    window.breadcrumb.PrefabNamespaces()
 
   window.anchor_handle.AddRoute /#show-class-[^-]+$/, ->
     matches = /#show-class-([^-]+)$/.exec window.anchor_handle.anchor

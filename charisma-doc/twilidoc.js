@@ -247,10 +247,12 @@
 
     function Attribute() {}
 
-    Attribute.prototype.TypeBox = function(name, attrs, type, is_typedef) {
+    Attribute.prototype.TypeBox = function(name, attrs, type, is_typedef, name_only) {
       var classname, desc, html, klass;
       html = '';
-      html += "<p class='btn-group'>";
+      if (name_only !== true) {
+        html += "<p class='btn-group'>";
+      }
       if (attrs & ATTR_PTR) {
         html += "<button class='btn btn-mini btn-info'>ptr</button>";
       }
@@ -278,15 +280,32 @@
       } else {
         html += "<button class='btn btn-mini btn-inverse'>" + name + "</button>";
       }
-      html += "</p>";
+      if (name_only !== true) {
+        html += "</p>";
+      }
       return html;
     };
 
     Attribute.prototype.Attribufy = function(html) {
-      return html.replace(/\[([a-z0-9_]+)\]/ig, function(match, content, offset, s) {
-        var type;
+      return html.replace(/\[(((const|unsigned)\s*)*([a-z0-9_]+(::)?)*)\]/ig, function(match, content, offset, s) {
+        var attrs, type;
+        attrs = 0;
+        while ((content.match(/^(const|unsigned)\s/)) != null) {
+          if ((content.substring(0, 5)) === 'const') {
+            content = content.substring(6, content.length);
+            attrs |= ATTR_CONST;
+          } else if ((content.substring(0, 8)) === 'unsigned') {
+            content = content.substring(9, content.length);
+            attrs |= ATTR_UNSIGNED;
+          } else {
+            break;
+          }
+        }
         type = Project.prototype.GetType(content, null);
-        return Attribute.prototype.TypeBox(content, 0, type, false);
+        html = Attribute.prototype.TypeBox(content, attrs, type, false, true);
+        html = html.replace('<button', '<a');
+        html = html.replace('button>', 'a>');
+        return html;
       });
     };
 
@@ -381,11 +400,20 @@
       if (method.attrs & ATTR_VIRTUAL) {
         visibility = '<span class="label label-inverse"><i class="icon-random"></i> Virtual</span> ' + visibility;
       }
-      params = escape_html(method.params);
+      params = method.params;
+      params = params.replace(/^\(\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)/ig, function(match, content, offset, s) {
+        match = match.replace('(', '[');
+        match += ']';
+        return '(' + match;
+      });
+      params = params.replace(/,\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)(\s*|,|)/ig, function(match, content, offset, s) {
+        return ", [" + content + "]";
+      });
+      params = Attribute.prototype.Attribufy(params);
       html += "</span>";
       html += "<div class='span9'>";
-      html += "<span class='span3'><h4>" + method.name + "</h4></span>";
-      html += "<span class='span6'><pre>" + params + "</pre></span>";
+      html += "<span class='span3'><h4 class='method-name'>" + method.name + "</h4></span>";
+      html += "<span class='span6'><div class='box box-params'>" + params + "</div></span>";
       html += "<span class='span3'><div style='float:right;'>" + visibility + "</div></span>";
       html += "</div>";
       if (method.doc != null) {
@@ -461,6 +489,7 @@
       }
       doc += '</dl></div>';
       doc = doc.replace('<pre>', '<pre class="sh_cpp">');
+      doc = Attribute.prototype.Attribufy(doc);
       if (has_doc) {
         return doc;
       } else {
@@ -525,7 +554,7 @@
         async: false,
         success: function(data) {
           html += Widget.prototype.Begin("Documentation", "icon-file");
-          html += data;
+          html += Attribute.prototype.Attribufy(data);
           return html += Widget.prototype.End();
         }
       });
@@ -546,10 +575,14 @@
 
     __extends(ClassList, _super);
 
-    function ClassList() {
-      var html, i, type, _i, _len, _ref, _ref1;
-      html = Widget.prototype.Begin("Class Index (" + project.types.length + " classes)", 'icon-list');
-      html += "<table class='table table-striped table-bordered bootstrap-datatable datatable dataTable' id='DataTables_Table_0' aria-describedby='DataTables_Table_0_info'>";
+    function ClassList(object_types) {
+      var html, i, title, type, _i, _len, _ref, _ref1;
+      if (object_types == null) {
+        object_types = ['class', 'struct'];
+      }
+      title = object_types.Includes('class') ? 'Class Index' : 'Namespace Index';
+      html = Widget.prototype.Begin(title, 'icon-list');
+      html += "<table class='table table-striped table-bordered bootstrap-datatable datatable dataTable'>";
       html += "<thead>";
       html += "<tr role='row'>";
       html += "<th>File</th>";
@@ -563,6 +596,9 @@
       _ref = project.types;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         type = _ref[_i];
+        if (!object_types.Includes(type.decl)) {
+          continue;
+        }
         html += "<tr class='" + ((_ref1 = i % 2 === 0) != null ? _ref1 : {
           'even': 'odd'
         }) + "'>";
@@ -574,7 +610,7 @@
         }
         html += "</td>";
         html += "<td>";
-        html += "<a class='btn btn-success' href='#show-class-" + type.name + "'>";
+        html += "<a class='btn btn-success' href='#show-" + object_types[0] + "-" + type.name + "'>";
         html += "<i class='icon-zoom-in icon-white' /> View";
         html += "</a>";
         if ((type.doc != null) && type.doc.overview !== '') {
@@ -791,6 +827,10 @@
       html += "</li>";
       this.dom.append(html);
       return this;
+    };
+
+    Breadcrumb.prototype.PrefabNamespaces = function() {
+      return this.Clear().Add('Project').Add('Namespaces', '#namespaces-index');
     };
 
     Breadcrumb.prototype.PrefabClasses = function() {
@@ -1028,6 +1068,13 @@
       }
       window.class_list.Display();
       return window.breadcrumb.PrefabClasses();
+    });
+    window.anchor_handle.AddRoute(/#namespaces-index/, function() {
+      if (window.namespaces_list == null) {
+        window.namespaces_list = new ClassList(['namespace']);
+      }
+      window.namespaces_list.Display();
+      return window.breadcrumb.PrefabNamespaces();
     });
     window.anchor_handle.AddRoute(/#show-class-[^-]+$/, function() {
       var class_view, matches;
