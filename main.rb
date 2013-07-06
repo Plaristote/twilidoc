@@ -79,11 +79,11 @@ json = String.new
 
 def document_objects global_scope, doc
   doc.each do |key,value|
-    puts "Documentation for #{key}"
     object     = global_scope.solve_type key
 
     if object.nil?
-      $stderr.print "Cannot solve type #{key}\n"
+      puts "Cannot solve type #{key}\n"
+      #$stderr.print "Cannot solve type #{key}\n"
       next
     end
 
@@ -100,10 +100,6 @@ def document_objects global_scope, doc
       object.attributes[i][:item].doc = value['attributes'][i]
       i += 1
     end unless value['attributes'].nil?
-
-    puts "->  #{object.inspect}"
-    puts "->  #{value.inspect}"
-    puts ''
   end
 end
 
@@ -200,6 +196,7 @@ def jsonify_object object, namespaces, json = nil
   json
 end
 
+global_scope.merge_namespaces
 document_objects global_scope, project_desc
 
 project_desc = { homepage: CONF['description'] }

@@ -30,6 +30,31 @@ class ClassParser
       @typedefs   = []
     end
 
+    def merge_namespaces
+      i = 0
+      while i < objects.size
+        if objects[i][:item].type == :namespace
+
+          # Looking for similar namespaces
+
+          ii = i + 1
+          while ii < objects.size
+            if (objects[ii][:item].type == :namespace) and (objects[ii][:item].name == objects[i][:item].name)
+              [ :methods, :attributes, :objects, :enums, :typedefs ].each do |items|
+                eval "objects[i][:item].#{items} += objects[ii][:item].#{items}"
+              end
+              objects.delete_at ii
+            end
+            ii += 1
+          end
+
+        end
+
+        objects[i][:item].merge_namespaces
+        i += 1
+      end
+    end
+
     def solve_type symbol
       parts = (symbol.split '::')
       objects.each do |object|
@@ -87,7 +112,11 @@ class ClassParser
       else
         evaluate_member
       end
-      [ item, visibility ]
+      if item.class == Array
+        item
+      else
+        [ item, visibility ]
+      end
     end
 
     def evaluate_enum
@@ -130,12 +159,12 @@ class ClassParser
             next
           end
         else
-          if word =~ /(public|private|protected)/
-            word = word.pop if word.last == ','
-            visibility = word
+          if word =~ /(public|private|protected|virtual)/
+            word       = word.pop if word.last == ','
+            visibility = word unless word =~ /virtual/
           else
-            word = word.pop_first if word.first == ','
-            word = word.pop       if word.last  == ','
+            word       = word.pop_first if word.first == ','
+            word       = word.pop       if word.last  == ','
             hash[:inherits] << ({ visibility: visibility, type: word })
             visibility = :public
           end
@@ -158,7 +187,8 @@ class ClassParser
       end
 
       is_specialization     = false
-      to_check = if @words[0] == /^(class|struct)/
+      puts @words[0]
+      to_check = if @words[0] =~ /^(class|struct)/
         @words
       else
         i = 0
@@ -287,7 +317,7 @@ class ClassParser
       break if end_reached?
 
       delimiters.each do |delimiter|
-        if @code[@it] == delimiter[0]
+        if (@code[@it] == delimiter[0]) and (@code[word_start..@it] != 'operator<')
           contexts << delimiter[1]
           break
         end
