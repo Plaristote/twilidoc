@@ -61,8 +61,10 @@ class Project
 
   GetType: (name, parent) ->
     name = name.string if name.string?
+    if (name.match /</)?
+      name = new String name
+      name = (name.Split '<')[0]
     candidates = CandidatesFromType name, parent
-    console.log "AAAACHTUNG!:", candidates if name == 'Level'
     if candidates.length > 0
       console.log candidates
       for type in project.types

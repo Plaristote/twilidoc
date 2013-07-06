@@ -108,10 +108,11 @@
       if (name.string != null) {
         name = name.string;
       }
-      candidates = CandidatesFromType(name, parent);
-      if (name === 'Level') {
-        console.log("AAAACHTUNG!:", candidates);
+      if ((name.match(/</)) != null) {
+        name = new String(name);
+        name = (name.Split('<'))[0];
       }
+      candidates = CandidatesFromType(name, parent);
       if (candidates.length > 0) {
         console.log(candidates);
         _ref = project.types;
