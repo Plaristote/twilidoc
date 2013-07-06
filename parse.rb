@@ -217,7 +217,7 @@ class ClassParser
     def evaluate_member
       it          = 0
       looking_for = :type
-      qualifiers  = [ 'const', 'static', 'inline', 'virtual', 'unsigned' ]
+      qualifiers  = [ 'const', 'static', 'inline', 'virtual', 'unsigned', 'typename' ]
       while it < @words.size
         word = @words[it]
         if qualifiers.include? word
