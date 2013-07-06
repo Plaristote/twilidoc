@@ -6,6 +6,7 @@ module CppParser
 
     def initialize
       @defines      = Hash.new
+      @macros       = Hash.new
       @source       = String.new
       @skipping     = false
       @skip_level   = 0
@@ -13,13 +14,117 @@ module CppParser
       @cur_path     = ''
       @inc_pathes   = []
       @filemap      = []
+      @files        = []
     end
 
     def skipping?
       @skipping == true && @if_level >= @skip_level
     end
 
+    def make_epured_line line
+      epured_line = line.dup
+      ii = 0
+      while ii < line.size
+        sep     = line[ii]
+        escaped = false
+        if (sep == '"') || (sep == "'")
+          while (line[ii] != sep) or (escaped == true)
+            escaped         = if line[ii] == "\\" then true else false end
+            epured_line[ii] = ' '
+            ii             += 1
+          end
+          epured_line[ii] = ' '
+        elsif line[ii..ii + 1] == '//'
+          (epured_line[ii] = ' ' ; ii += 1) while (line[ii] != "\n") and (line[ii] != nil)
+        elsif line[ii..ii + 1] == '/*'
+          (epured_line[ii] = ' ' ; ii += 1) while (line[ii..ii + 1] != '*/') and (line[ii] != nil)
+          epured_line[ii] = ' '
+        end
+
+        ii += 1
+      end
+      epured_line
+    end
+
+    def solve_variables variables, line
+      match = false
+      begin
+        epured_line = make_epured_line line
+        match       = false
+#        puts variables.inspect
+        variables.each do |key,value|
+          epured_line.scan /([^a-z0-9_])#{key}([^a-z0-9_])/ do
+#            puts "Solving variable #{key}"
+            bpos = ($~.offset 1)[1]
+            epos = ($~.offset 2)[0]
+            if epured_line[bpos] == '#'
+              epured_line = epured_line.emplace "\"#{value}\"", bpos - 1, epos
+              line        = line.emplace        "\"#{value}\"", bpos - 1, epos
+            elsif epured_line[epos..epos + 1] == '##'
+              epured_line = epured_line.emplace value, bpos, epos - 1
+              line        = line.emplace        value, bpos, epos - 1
+            else
+              epured_line = epured_line.emplace value, bpos, epos
+              line        = line.emplace        value, bpos, epos
+            end
+            match = true
+            break
+          end
+        end
+      end while match == true
+#      puts 'Solved defines'
+      line
+    end
+
+    def solve_macros line
+      no_macros = true
+      match     = false
+      begin
+        epured_line = make_epured_line line
+        match       = false 
+        @macros.each do |key,value|
+          epured_line.scan /([^a-z0-9_])#{key}(\()/ do
+            bpos = $~.offset 1
+            epos = $~.offset 2
+
+            p_names  = (value[:params].gsub /\s/, '').split ','
+            params   = {}
+            iii      = epos[1]
+            contexts = []
+            start_p  = iii
+            while iii < line.size
+              if ([ ',', ')' ].include? line[iii]) and (contexts.size == 0)
+                params[p_names[params.size]] = line[start_p...iii]
+                start_p = iii + 1
+              elsif line[iii] == '('
+                contexts << ')'
+              elsif line[iii] == contexts.last
+                contexts.pop
+              end
+              iii += 1
+              break if line[iii - 1] == ')'
+            end
+
+            puts ('Solving macro ' + key + " with parameters #{params.inspect}, p_names was #{p_names.inspect}")
+
+            line      = line.emplace value[:value], bpos[1], iii
+            line      = solve_variables params, line
+            match     = true
+            no_macros = false
+            break
+          end
+        end
+      end while match == true
+      line = solve_variables @defines, line
+      if no_macros == false
+        solve_macros line
+      else
+        line
+      end
+    end
+
     def parse file
+      puts '[Preprocessor] Evaluating "' + file + '"'
       path        = (File.expand_path file).split '/'
       path        = path[0...path.size - 1].join '/'
       @cur_path   = path
@@ -34,28 +139,15 @@ module CppParser
           i       = read_directive lines, i
           next
         end
-	@defines.each do |key,value|
-          next
-	  parts    = key.split '('
-	  is_macro = parts.size > 1
-	  if is_macro
-	    macro  = parts[0]
-	    params = parts[1..parts.size].join '('
-	    if line =~ macro
-	      puts "Found a macro to use"
-	      exit 0
-	    end
-	  else
-	    old = line.dup
-	    line.gsub! /#{key}/, "#{value}"
-	    if old != line
-	      puts "Line has been modified with macro:\n\t#{old}\n\t#{line}\n\n"
-	    end
-	  end
-	end
-        @source  += line + "\n" unless skipping?
+
+        unless skipping?
+          line      = solve_macros line
+          @source  += line + "\n"
+        end
+
         @cur_path = path
         i        += 1
+
       end
       filename = Pathname.new file
       if filename.absolute?
@@ -85,11 +177,21 @@ private
 
     def directive_define line
       return if skipping?
-      parts = line.split ' '
-      name  = parts[0]
-      value = parts[1..parts.size].join ' '
-      @defines[name] = value
-      puts "Found define #{name} -> #{value}"
+      results = line.scan /([a-z0-9_]+)\((([a-z0-9_]+\s*,?\s*)*)\)\s(.*)/i
+      if results.nil? or (results == [])
+        parts = line.split ' '
+        name  = parts[0]
+        value = parts[1..parts.size].join ' '
+        @defines[name] = value
+        puts "Found define #{name} -> #{value}"
+      else
+        results = results.first
+        name    = results[0]
+        params  = results[1]
+        value   = results[3]
+        @macros[name] = { value: value, params: params }
+        puts "Found macro #{name} -> #{value.gsub /\s+/, ' '}"
+      end
     end
 
     def directive_undef line

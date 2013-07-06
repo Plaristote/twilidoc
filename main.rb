@@ -1,12 +1,8 @@
 #!/usr/bin/ruby
 @active_log = false
-def require_local name
- path  = File.expand_path (File.dirname __FILE__)
- path += "/#{name}.rb"
- require path
-end
+$: << (File.expand_path (File.dirname __FILE__))
 
-require       'optparse'
+require 'optparse'
 
 options = {
     output: 'doc',
@@ -16,15 +12,17 @@ options = {
 OptionParser.new do |opts|
   opts.banner = "usage: #{ARGV[0]} [options]"
   opts.on '-o', '--output PATH', 'Set an output'     do |v| options[:output] = v end
-  opts.on '-i', '--input',  'Set input project file' do |v| options[:input]  = v end
+  opts.on '-i', '--input PATH',  'Set input project file' do |v| options[:input]  = v end
+  opts.on '-s', '--source PATH', 'Use already compiled headers instead of compiling them' do |v| options[:source] = v end
+  opts.on '-c', '--compile PATH', 'Output the compiled headers in a file' do |v| options[:compile_output] = v end
 end.parse!
 
-require       'yaml'
+require 'yaml'
 CONF = YAML.load (File.open options[:input])
-require       'json'
-require_local 'sexydoc'
-require_local 'preprocessor'
-require_local 'cppparser'
+require 'json'
+require 'twilidoc_string'
+require 'preprocessor'
+require 'parse'
 
 headers      = []
 descriptors  = []
@@ -37,455 +35,180 @@ CONF['includes'].each do |path|
   descriptors += dot_yml
 end
 
-preprocessor = CppParser::Preprocessor.new
-preprocessor.inc_pathes = CONF['includes']
-
+print "Loading documentation..."
 project_desc = {}
 
-print "Running preprocessor..."
-headers.each     do |header|
-  preprocessor.parse header
-end
 descriptors.each do |descriptor|
   yml        = YAML.load (File.open descriptor)
   project_desc.merge! yml
 end
 puts " [Done]"
 
-line_length  = 0
+sample = if options[:source].nil?
 
-filemap      = preprocessor.filemap
-sample       = preprocessor.source
+  preprocessor = CppParser::Preprocessor.new
+  preprocessor.inc_pathes = CONF['includes']
 
-project      = SexyDoc::Project.new
-project.name = CONF['name']
-project.desc = CONF['description']
-project.doc  = project_desc
-
-namespaces      = []
-file_arch       = []
-visibility_arch = []
-func_scopes     = []
-def get_file_containing declared_at, filemap
-  file = nil
-  filemap.each do |block|
-    file = block[:filename] ; break if block[:beg] <= declared_at[0] and block[:end] >= declared_at[1]
+  print "Running preprocessor..."
+  headers.each     do |header|
+    preprocessor.parse header
   end
-  file
+  puts " [Done]"
+
+  line_length  = 0
+
+  filemap      = preprocessor.filemap
+  sample       = preprocessor.source
+
+  File.open options[:compile_output], 'w' do |f|
+    f.write sample
+  end unless options[:compile_output].nil?
+
+  sample
+else
+  File.read options[:source]
 end
 
-def get_namespace declared_at, namespaces
-  namespace = nil
-  namespaces.each do |block|
-    namespace = block[:name] if block[:beg] <= declared_at[0] and block[:end] >= declared_at[1]
-  end
-  namespace
-end
+print "Running cpp probe..."
+global_scope = ClassParser::Object.new
+fuente       = ClassParser.new sample
+fuente.probe global_scope
+puts " [Done]"
 
-def get_visibility declared_at, visibility_arch
-  visibility = 'unknown'
-  visibility_arch.each do |block|
-    if block[:beg] <= declared_at and block[:end] >= declared_at
-      visibility = block[:visibility]
-    end
-  end
-  visibility
-end
+json = String.new
 
-def is_in_func? declared_at, func_scopes
-  func_scopes.each do |block|
-    return true if block[:beg] <= declared_at and block[:end] >= declared_at
-  end
-  false
-end
+def document_objects global_scope, doc
+  doc.each do |key,value|
+    puts "Documentation for #{key}"
+    object     = global_scope.solve_type key
 
-##
-## Here we duplicate the code.
-## 'sample' will be the original code.
-## 'code'   will be the code with wiped out commentaries and string
-##
-#require 'ruby-progressbar'
-class ProgressBarStub
-  def increment
-  end
-  def finish
-  end
-end
-
-i    = 0
-code = sample.dup
-#bar  = ProgressBar.create title: 'Wiping out commentaries and strings', total: (code.size + 1)
-bar  = ProgressBarStub.new
-
-n_parts   = code.size / 20000
-part_size = code.size / n_parts
-parts     = []
-n_parts.times do
-  parts << code[0...part_size + 1]
-  code = code[part_size + 1..code.size]
-end
-
-puts '-> Wiping out commentaires and string'
-thread_pool = []
-parts.each do |part|
-  thread = Thread.new do
-    li = 0
-    while li < part.size
-      p = CppParser.handle_skip part, li
-      if p != li
-        ii = li
-        while ii <= p
-          part[ii] = '#'
-          ii += 1
-        end
-        ((p - 1) / n_parts).times { bar.increment }
-        li = p
-      end
-      bar.increment
-      li += 1
-    end
-  end
-  thread_pool << thread
-end
-
-thread_pool.each do |thread|
-  thread.join
-end
-i = 0
-bar.finish
-
-code = parts.join
-
-puts '--> Done'
-
-code.scan /namespace\s+([a-zA-Z0-9_]+)\s+{/m do
-  namespace = $1
-  beg       = ($~.offset 1)[0]
-  _end      = ($~.offset 1)[1]
-
-  code_sample = code[_end..code.size]
-  inline_code = CppParser.get_block code_sample  
-  
-  _end        = _end + inline_code.size
-
-  father    = get_namespace [ beg, _end ], namespaces
-  namespace = "#{father}::#{namespace}" unless father.nil?
-  namespaces << { :beg => beg, :end => _end, name: namespace }
-  puts namespaces.last.inspect if namespace == 'AngelScript'
-end
-
-code.scan /(class|struct|union)\s+([a-zA-Z0-9_]+)\s+(:([^{]*))?{/ do
-  decl_type    = $1
-  class_name   = $2
-  symbol       = class_name
-  inheritences = $4
-  inline_code  = ''
-
-  print "\r"
-  line_length.times do print ' ' end
-  line        = "PARSING CLASS #{class_name}"
-  line_length = line.size
-  print "\r#{line}"
-
-  inherits = unless inheritences.nil?
-    inheritences = inheritences.split ','
-    to_ret = []
-    inheritences.each do |i|
-      elems = i.split ' '
-      to_ret << { visibility: elems[0].to_sym, class: elems[1] }
-    end
-    to_ret
-  else
-    []
-  end
-
-  offset_begin = if $4.nil? then $~.offset 2 else $~.offset 4 end[1]
-  code_sample  = sample[offset_begin..sample.size]
-  #inline_code  = CppParser.get_block code_sample
-  inline_code  = CppParser.get_filtered_block code_sample
-
-  # Since this procedure is supposed to find class in the right order,
-  # we should not have to check for which is the deepest file_arch match:
-  # the last one should be the deepest
-  file_arch.each do |arch|
-    if arch[:beg] < offset_begin and arch[:end] > offset_begin + inline_code.size
-      symbol = "#{arch[:symbol]}::#{class_name}"
-    end
-  end
-  namespace = get_namespace [ offset_begin, offset_begin + inline_code.size ], namespaces
-  symbol = "#{namespace}::#{symbol}" unless namespace.nil?
-  file_arch << { beg: offset_begin, end: offset_begin + inline_code.size, symbol: symbol }
-  ##
-  ## Find containing file
-  ##
-  file = get_file_containing [ offset_begin, offset_begin + inline_code.size ], filemap
-
-  ##
-  ## Visibility (public/protected/private) map generation
-  ##
-  visibility_it      = offset_begin
-  visibility_current = if decl_type == 'class' then 'private' else 'public' end
-  i                  = 0
-  while i < inline_code.size
-    tocheck = [ 'public', 'protected', 'private' ]
-    tocheck.each do |visib|
-      if inline_code[i..i + visib.size] == visib + ':'
-	visibility_arch << { beg: visibility_it, end: offset_begin + i, visibility: visibility_current }
-	visibility_current = visib
-	visibility_it      = offset_begin + i + visib.size
-	i                 += visib.size
-	break
-      end
-    end
-    i += 1
-  end
-  visibility_arch << { beg: visibility_it, end: offset_begin + inline_code.size, visibility: visibility_current }
-
-  #puts "Decl type    #{decl_type}"
-  #puts "Class name   #{symbol}"
-  #puts "Inherits:    #{inherits.inspect}"
-  #puts code
-
-  type             = SexyDoc::Type.new project
-  type.name        = symbol
-  type.declared_in = file
-  type.declared_as = decl_type
-  type.ancestors   = inherits
-
-  project.types << type
-end
-puts ''
-
-##
-## Fetch typedefs
-##
-code.scan /typedef\s+([^;]+)\s+([^;]+)\s*;/ do
-  belongs_to  = nil
-  file_arch.each do |arch|
-    if arch[:beg] < ($~.offset 1)[0] and arch[:end] > ($~.offset 2)[0]
-      belongs_to = arch[:symbol]
-    end
-  end
-
-  belongs_to = project.find_type belongs_to unless belongs_to.nil?
-  namespaces = unless belongs_to.nil? then belongs_to.namespaces project else [] end
-
-  name         = $2
-  typename     = $1
-  type         = project.find_type typename, namespaces
-  name         = if belongs_to.nil? then name else "#{belongs_to.name}::#{name}" end
-  typedef      = SexyDoc::Typedef.new typename, type
-  typedef.name = name
-
-  project.types << typedef
-end
-
-##
-## Fetch operator overloads
-##
-overloads = [
-    'operator=',
-    'operator==',
-    'operator!=',
-    'operator<',
-    'operator>',
-    'operator++',
-    'operator--',
-    'operator*',
-    'operator+',
-    'operator-',
-    'operator[]',
-    'operator()',
-    'operator->',
-  ]
-overloads = (overloads.map { |overload| Regexp.quote overload }).join '|'
-
-##
-## Fetch functions
-##
-file_arch.each do |class_scope|
-  puts class_scope.inspect
-
-  scope           = code[class_scope[:beg]..class_scope[:end] + 1]
-  untainted_scope = sample[class_scope[:beg]..class_scope[:end] + 1]
-  puts 'Fetching methods for class: #{class_scope[:symbol]}'
-  #puts scope
-
-  puts sample[class_scope[:beg]..class_scope[:end] + 1]
-  puts ""
-  puts ""
-
-
-  scope.scan /((([a-z0-9_]+::)*[a-z0-9_&*]+\s+)+)([a-z0-9_,\s]+|#{overloads})\s*(\([^)]*\))/i do
-    return_type = $1
-    name        = $4
-
-    next if return_type.strip == 'new' 
-
-    # In some cases the regex fails to find the function's name. In this case it
-    # is stored as a return qualifier. Either fix the regex or keep this block:
-    if name == ' '
-      words       = return_type.split ' '
-      name        = words.last
-      return_type = words[0...words.size - 1].join ' '
+    if object.nil?
+      $stderr.print "Cannot solve type #{key}\n"
+      next
     end
 
-    puts "-> #{class_scope[:symbol]}::#{name}"
+    object.doc = { overview: value['overview'], detail: value['detail'] }
 
-    method      = SexyDoc::Function.new project
-    method.name = name
-
-    end_offset  =  $~.offset 5
-    i           = end_offset[1]
-    while i < code.size
-      method.attrs |= SexyDoc::ATTR_CONST if scope[i..(i + 'const'.size - 1)] == 'const'
-      break if scope[i] == ';'
-      if scope[i] == '{'
-        code_begin  = i
-        method.code = CppParser.get_block untainted_scope[i..untainted_scope.size]
-        func_scopes << { beg: i, end: i + method.code.size, method: method }
-        break
-      end
+    i    = 0
+    while i < object.methods.size and i < value['methods'].size
+      object.methods[i][:item].doc = value['methods'][i]
       i += 1
-    end
+    end unless value['methods'].nil?
 
-    params_offset = $~.offset 5
-    parameters    = untainted_scope[params_offset[0]...params_offset[1]]
-    parameters    = parameters.split ','
-    parameters.each {|p| p.strip! }
+    i    = 0
+    while i < object.attributes.size and i < value['attributes'].size
+      object.attributes[i][:item].doc = value['attributes'][i]
+      i += 1
+    end unless value['attributes'].nil?
 
-    method.parameters = parameters
-
-    return_type_spec = []
-    type_specs = return_type.split ' '
-    type_specs.each do |type_spec|
-      case type_spec
-      when 'inline'
-        method.attrs |= SexyDoc::ATTR_INLINE
-      when 'static'
-        method.attrs |= SexyDoc::ATTR_STATIC
-      when 'virtual'
-        method.attrs |= SexyDoc::ATTR_VIRTUAL
-      else
-        return_type_spec << type_spec
-      end
-    end
-
-    return_type = CppParser.attribute_from_type type_specs
-    next if return_type.nil? # Is not a real function call
-
-    belongs_to = class_scope[:symbol]
-
-    method.visibility = get_visibility (($~.offset 1)[0] + class_scope[:beg]), visibility_arch
-
-    type         = nil
-    namespaces   = []
-    unless belongs_to.nil?
-      type       = project.find_type belongs_to
-      namespaces = (type.namespaces project) unless type.nil?
-    end
-    method.klass = type
-    type.functions << method unless type.nil?
-
-    typename    = return_type.type
-    method.return_type[:attrs] = return_type.attrs
-    method.return_type[:type]  = project.find_type return_type.type, namespaces
-    method.return_type[:type]  = typename if method.return_type[:type].nil?
-
-    return_type_spec.each do |type_spec|
-      case type_spec
-      when 'const'
-        method.return_type[:attrs] |= SexyDoc::ATTR_CONST
-      when 'unsigned'
-        method.return_type[:attrs] |= SexyDoc::ATTR_UNSIGNED
-      else
-        type      = type_spec
-        last_char = type[type.size - 1]
-        if last_char == '*' or last_char == '&'
-          type    = type[0...(type.size - 1)]
-          if last_char == '*'
-            method.return_type[:attrs] |= SexyDoc::ATTR_PTR
-          elsif last_char == '&'
-            method.return_type[:attrs] |= SexyDoc::ATTR_REF
-          end
-        end
-        type = project.find_type type, namespaces
-        method.return_type[:type] = type unless type.nil?
-      end
-    end
+    puts "->  #{object.inspect}"
+    puts "->  #{value.inspect}"
+    puts ''
   end
 end
 
-##
-## Fetch attributes
-##
-code.scan /(([a-z0-9_&*]+(::[a-z0-9_&*]+)*\s+)+)([a-z0-9_,\s&*]+)\s*;/i do
-  beg        = ($~.offset 1)[0]
-  fin        = ($~.offset 4)[1]
-  belongs_to = nil
+ATTR_PTR      = 1
+ATTR_REF      = 2
+ATTR_CONST    = 4
+ATTR_UNSIGNED = 8
+ATTR_STATIC   = 16
+ATTR_INLINE   = 32
+ATTR_VIRTUAL  = 64
+ATTR_TYPEDEF  = 128
 
-  next if is_in_func? beg, func_scopes
-
-  file_arch.each do |arch|
-    if arch[:beg] <= beg and arch[:end] > beg
-      belongs_to = arch[:symbol]
-    end
+def flags2num flags
+  matches = {
+    pointer:   1,
+    reference: 2,
+    const:     4,
+    unsigned:  8,
+    static:    16,
+    inline:    32,
+    virtual:   64,
+  }
+  num = 0
+  flags.each do |value|
+    num += matches[value] unless matches[value].nil?
   end
-
-  type   = nil
-  unless belongs_to.nil?
-    type = project.find_type belongs_to
-  end
-
-  attrs = $4.split ','
-  attrs.each_with_index do |attr, i|
-    attribute         = CppParser.attribute_from_type $1.split ' ', i
-    next if attribute.nil? # Not an actual attribute
-    attribute.name    = attr.strip
-    attribute.project = project
-    if attribute.name[0] == '*' or attribute.name[0] == '&'
-      if attribute.name[0] == '*'
-        attribute.attrs |= SexyDoc::ATTR_PTR
-      elsif attribute.name[0] == '&'
-        attribute.attrs |= SexyDoc::ATTR_REF
-      end
-      attribute.name = attribute.name[1..attribute.name.size]
-    end
-    attribute.klass      = type
-    attribute.visibility = get_visibility beg, visibility_arch
-    type.attributes << attribute unless type.nil?
-  end
+  num
 end
 
-require 'erb'
-
-class String
-  def escape_quotes
-    gsub '"', '&quot;'
+def jsonify_object object, namespaces, json = nil
+  hash = Hash.new
+  if object.class == Hash
+    hash[:visibility] = object[:visibility]
+    object            = object[:item]
   end
+  hash[:name]       = object.name
+  hash[:name]       = "#{namespaces.join '::'}::#{hash[:name]}" if namespaces.size > 0
+  hash[:decl]       = object.type
+  hash[:file]       = ''
+  hash[:namespaces] = namespaces
+
+  hash[:constructors] = Array.new
+  hash[:methods]      = Array.new
+  hash[:attributes]   = Array.new
+  hash[:enums]        = Array.new
+  hash[:typedefs]     = Array.new
+  hash[:ancestors]    = object.inherits or Array.new
+  hash[:doc]          = object.doc
+
+  object.methods.each do |method|
+    hash_meth                = Hash.new
+    visibility               = method[:visibility]
+    method                   = method[:item]
+    hash_meth[:name]         = method.name
+    hash_meth[:params]       = method.params
+    hash_meth[:attrs]        = flags2num method.qualifiers
+    hash_meth[:return_type]  = method.type
+    hash_meth[:visibility]   = visibility
+    hash_meth[:return_attrs] = flags2num method.type_qualifiers
+    hash_meth[:doc]          = method.doc
+    hash[:methods] << hash_meth
+  end
+
+  object.attributes.each do |attribute|
+    hash_attr              = Hash.new
+    visibility             = attribute[:visibility]
+    attribute              = attribute[:item]
+    hash_attr[:name]       = attribute.name
+    hash_attr[:type]       = attribute.type
+    hash_attr[:attrs]      = flags2num attribute.type_qualifiers
+    hash_attr[:visibility] = visibility
+    hash_attr[:doc]        = attribute.doc
+    hash[:attributes] << hash_attr
+  end
+
+  object.typedefs.each do |typedef|
+    json[:typedefs]           = Array.new if json[:typedefs].nil?
+    hash_typedef              = Hash.new
+    prename                   = if object.name.nil? then '' else hash[:name] + '::' end
+    hash_typedef[:name]       = prename + typedef[:item].name
+    hash_typedef[:to]         = typedef[:item].type
+    hash_typedef[:visibility] = typedef[:visibility]
+    json[:typedefs] << hash_typedef
+  end
+
+  object.objects.each do |sub_object|
+    sub_namespaces = namespaces.dup
+    sub_namespaces << object.name unless object.name == nil
+    json = jsonify_object sub_object, sub_namespaces, json
+  end
+
+  json[:types]  = Array.new if json[:types].nil?
+  json[:types] << hash
+  json
 end
 
-# Generating files from ERB
+document_objects global_scope, project_desc
 
-o_prefix = options[:output]
-i_prefix = File.expand_path (File.dirname __FILE__)
+project_desc = { homepage: CONF['description'] }
+project_json = { name: CONF['name'], desc: project_desc }
+json         = jsonify_object global_scope, [], project_json
 
-js_template     = ERB.new (File.read "#{i_prefix}/project.js.erb")
-
-typedefs = project.typedefs
-str = "typedefs: ["
-i   = 0
-while i < typedefs.count
-  str += "{ name: \"#{typedefs[i].name}\", to: \"#{typedefs[i].typedef_to}\" }"
-  str += ",\n" if i < typedefs.count - 1
-  i += 1
+File.open "#{options[:output]}/project.js", 'w' do |f|
+  f.write 'var project = '
+  f.write json.to_json
+  f.write ';'
 end
-str += ']'
-typedefs_json = str
-puts "Done Generating Typedef JS"
 
-File.open "#{o_prefix}/project.js", 'w' do |f|
-  json = js_template.result binding
-  json += ",\n  #{typedefs_json}\n};"
-  f.write json
-end

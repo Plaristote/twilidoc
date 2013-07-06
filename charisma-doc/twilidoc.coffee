@@ -12,12 +12,82 @@ escape_html = (text) ->
   result = result.replace /</g, '&lt;'
   result = result.replace />/g, '&gt;'
 
+class String
+  constructor: (str) ->
+    @string = str
+
+  Substr: (i, end) ->
+    end    = if end? then end + i else @string.length
+    result = ''
+    while i < @string.length and i < end
+      result += @string[i]
+      i++
+    result
+
+  Split: (sep) ->
+    i         = 0
+    parts     = []
+    last_part = 0
+    while i + sep.length < @string.length
+      to_comp = @Substr i, sep.length
+      if to_comp == sep
+        parts.push (@Substr last_part, i - last_part)
+        last_part = i + sep.length
+        i         = last_part
+        continue
+      i++
+    if last_part != i
+      parts.push (@Substr last_part, @string.length)
+    parts
+
+window.String = String
+
+Array::Join = (sep) ->
+  string = ''
+  string += item for item in @
+  string
+
+Array::Includes = (item) ->
+  (@indexOf item) != -1
+
 class Project
-  GetTypedef: (name) ->
+  #public
+  GetTypedef: (name, parent) ->
+    candidates = CandidatesFromType name, parent
     for typedef in project.typedefs
-      if typedef.name == name
+      if candidates.Includes? typedef.name
         return typedef
     null
+
+  GetType: (name, parent) ->
+    name = name.string if name.string?
+    candidates = CandidatesFromType name, parent
+    console.log "AAAACHTUNG!:", candidates if name == 'Level'
+    if candidates.length > 0
+      console.log candidates
+      for type in project.types
+        continue unless type.name?
+        if candidates.Includes type.name
+          return type
+    null
+
+  #private
+  CandidatesFromType = (name, parent) ->
+    if parent? and name?
+      parent     = new String parent
+      parts      = parent.Split '::'
+      candidates = []
+      for part in parts
+        merge    = (candidates.Join '::') + part
+        candidates.push merge
+      i          = 0
+      candidates[i++] += '::' + name while i < candidates.length
+      candidates.push name
+      candidates
+    else if name?
+      [ name ]
+    else
+      []
 
 class View
   AfterFilter: () ->
@@ -76,33 +146,35 @@ class Widget
     "</div></div></div>"
 
 class Attribute
-  TypeBox: (name, attrs, classname, is_typedef) ->
+  TypeBox: (name, attrs, type, is_typedef) ->
     html  = ''
     html += "<p class='btn-group'>"
     html +=   "<button class='btn btn-mini btn-info'>ptr</button>" if (attrs & ATTR_PTR)
     html +=   "<button class='btn btn-mini btn-info'>ref</button>" if (attrs & ATTR_REF)
     html +=   "<button class='btn btn-mini'>const</button>"        if (attrs & ATTR_CONST)
     html +=   "<button class='btn btn-mini'>unsigned</button>"     if (attrs & ATTR_UNSIGNED)
-    if classname?
-      type      = window.get_project_type classname
+    name        = (name.replace /</g, '[').replace />/g,']'
+    if type? or is_typedef == true
       klass     = if is_typedef == true then 'btn-warning' else 'btn-success'
       html     += "<button class='btn btn-mini #{klass}'"
-      html     += " data-route='#show-class-#{classname}'" unless (is_typedef and type == null)
+      html     += " data-route='#show-class-#{type.name}'" unless (is_typedef and type == null)
       # Popover
       desc      = if type == null or !(type.doc?) then 'Undocumented type' else type.doc.overview.replace "'", "&#39;"
       #classname = (classname.replace /</g, '&lt;').replace />/g, '&gt;'
-      classname = (classname.replace /</g, '«').replace />/g, '»'
+      classname = if type? then type.name else name
+      classname = (classname.replace /</g, '[').replace />/g,']'
       html     += "data-rel='popover' data-content='#{desc}' title='#{classname}'"
       # End popover
       html += ">#{name}</button>"
     else
-      html += "<button class='btn btn-mini btn-inverse'>#{name}</button>"
-    html += "</p>"
+      html     += "<button class='btn btn-mini btn-inverse'>#{name}</button>"
+    html       += "</p>"
     html
     
   Attribufy: (html) ->
     html.replace /\[([a-z0-9_]+)\]/ig, (match, content, offset, s) ->
-      Attribute::TypeBox content, 0, content, false
+      type = Project::GetType content, null
+      Attribute::TypeBox content, 0, type, false
 
 ##
 ## Single Element View
@@ -114,9 +186,9 @@ class Member extends View
     icon = 'icon-asterisk' if type == 'attribute'
     html = Widget::Begin "#{classname}::#{element.name}", icon
     if type == 'method'
-      html += @RenderMethod element
+      html += @RenderMethod element, classname
     else if type == 'attribute'
-      html += @RenderAttribute element
+      html += @RenderAttribute element, classname
     else
       alert "Unimplemented type #{type} for Member View"
       throw "Unimplemented type #{type} for Member View"
@@ -127,21 +199,43 @@ class Member extends View
     super
     sh_highlightDocument()
   
-  RenderMethod: (method) ->
+  RenderMethod: (method, classname) ->
     html  = ''
-    obj_type = window.get_project_type method.return_type
     html += "<div class='span12' style='margin-top: 10px;'><div>"
     html += "<div class='method-descriptor'>"
     html += "<span class='span3'>"
 
-    if not obj_type?
-      typedef = Project::GetTypedef method.return_type
-      if typedef?
-        html += Attribute::TypeBox method.return_type, method.return_attrs, typedef.to, true
+    if method.return_type? # Is not a constructor/destructor
+      name            = new String method.return_type
+      template_parts  = (name.Split '<')
+      if template_parts.length > 1
+        name          = template_parts[0]
+      console.log "Classname is: #{classname}!"
+      return_type = Project::GetType name, classname
+      #return_type = get_project_type method.return_type, classname
+      if not return_type?
+
+        typedef       = Project::GetTypedef name, classname
+        _typedef      = typedef
+        while (not return_type?) and (_typedef?)
+          return_type = Project::GetType    _typedef.to, classname
+          if not return_type?
+            _typedef  = Project::GetTypedef _typedef.to, classname
+
+        if typedef?
+          if return_type?
+            html += Attribute::TypeBox typedef.name, method.return_attrs, return_type, true
+          else
+            html += Attribute::TypeBox typedef.name, method.return_attrs, { name: typedef.to }, true
+        else
+          html += Attribute::TypeBox method.return_type, method.return_attrs
+      else if return_type?
+        html += Attribute::TypeBox method.return_type, method.return_attrs, return_type
+    else # Is a constructor/destructor
+      if method.name[0] != '~'
+        html += '<span class="label label-info"><i class="icon-cogs"></i> Constructor</span>'
       else
-        html += Attribute::TypeBox method.return_type, method.return_attrs
-    else if obj_type?
-      html += Attribute::TypeBox method.return_type, method.return_attrs, obj_type.name
+        html += '<span class="label label-info"><i class="icon-trash"></i> Destructor</span>'
 
     visibility = {
       class:   '<span class="label label-warning"><i class="icon-tag"></i> Class</span>',
@@ -154,7 +248,7 @@ class Member extends View
     if method.attrs & ATTR_VIRTUAL
       visibility = '<span class="label label-inverse"><i class="icon-random"></i> Virtual</span> ' + visibility
 
-    params = escape_html method.params.join ', '
+    params = escape_html method.params
     html += "</span>"
     html += "<div class='span9'>"
     html +=   "<span class='span3'><h4>" + method.name + "</h4></span>"
@@ -168,19 +262,29 @@ class Member extends View
     html  = html.replace '<pre>', '<pre class="sh_cpp">'
     html
 
-  RenderAttribute: (attribute) ->
+  RenderAttribute: (attribute, classname) ->
     html  = ''
-    obj_type = window.get_project_type attribute.obj_type if attribute.obj_type?
+    obj_type = Project::GetType attribute.type, classname
+    #obj_type = window.get_project_type attribute.type if attribute.type?
     html += "<div class='span12' style='margin-top: 10px;'><div>"
     html += "<div class='attribute-descriptor'>"
     html += "<span class='span3'>"
-    if attribute.obj_type? and not obj_type?
-      typedef = Project::GetTypedef attribute.obj_type
-      html += Attribute::TypeBox attribute.type, attribute.attrs, typedef.to, true
-    else if obj_type?
-      html += Attribute::TypeBox attribute.type, attribute.attrs, obj_type.name
+    if not obj_type?
+      typedef        = Project::GetTypedef attribute.type, classname
+      _typedef       = typedef
+      while (not obj_type?) and (_typedef?)
+        obj_type   = Project::GetType       _typedef.to, classname
+        if not obj_type?
+          _typedef = Project::GetTypedef _typedef.to, classname
+      if typedef?
+        if obj_type?
+          html += Attribute::TypeBox typedef.name, attribute.attrs, obj_type, true
+        else
+          html += Attribute::TypeBox typedef.name, attribute.attrs, { name: typedef.to }, true
+      else
+        html += Attribute::TypeBox attribute.type, attribute.attrs
     else
-      html += Attribute::TypeBox attribute.type, attribute.attrs
+      html += Attribute::TypeBox attribute.type, attribute.attrs, obj_type
     html += "</span>"
     html += "<span class='span6'>"
     html += "<h4>" + attribute.name + "</h4>"
@@ -227,13 +331,13 @@ class Class extends View
     html  = Widget::Begin "#{type.decl} #{type.name}", 'icon-list-alt'
     html += "<div id='uml'></div>"
     html += Widget::End()
-    
+
     if @type.methods.length > 0
       html += Widget::Begin "Methods", "icon-cog"
       html += "<div class='span12'></div>"
       for method in @type.methods
         html += "<div class='visibility-#{method.visibility}'>"
-        html += Member::RenderMethod method
+        html += Member::RenderMethod method, classname
         html += "</div>" # Visibility
       html += Widget::End()
 
@@ -242,10 +346,21 @@ class Class extends View
       html += "<div class='span12'></div>"
       for attribute in @type.attributes
         html += "<div class='visibility-#{attribute.visibility}'>"
-        html += Member::RenderAttribute attribute
+        html += Member::RenderAttribute attribute, classname
         html += "</div>" # visibility
         obj_type = null
       html += Widget::End()
+
+    $.ajax {
+        url:      "docs/#{classname}.html",
+        dataType: 'html',
+        async:     false,
+        success: (data) ->
+          html += Widget::Begin "Documentation", "icon-file"
+          html += data
+          html += Widget::End()
+      }
+
     @elem = $(html)
     
   AfterFilter: () ->
