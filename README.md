@@ -2,7 +2,7 @@ Twilidoc
 ========
 
 Twilidoc is a documentatin generator for C++. It has two major objectives:
-- Non-intrusive documentation: I do not need nor do I like having comments in my headers. They only get harder to read.
+- Non-intrusive documentation: no need to bloat your headers with annotations
 - Easy, pretty and dynamic web interface
 
 Twilidoc is composed of a Ruby script that probes C++ headers and generate a JSON object containing the description of your
@@ -20,9 +20,13 @@ http://fallout-equestria.googlecode.com/git/doc/blank.html
 
 Howto
 ==
+Install the twilidoc gem
+
+    gem install twilidoc
+
 The ruby script from main.rb harvests data from your code to generate a json file describing your project:
 
-    ruby main.rb -i project.yml -o doc
+    twilidoc -i project.yml -o doc
 
 The input file project.yml contains some configuration values about where to find your headers and other informations
 about your project.
@@ -34,7 +38,7 @@ It looks like this:
       - "other_directory"
     description: |
       <h5>Homepage</h5>
-      You're project's homepage.
+      Your project's homepage.
 
 The includes directories are searched recursively. You can also pair your headers with yml files to add further informations:
 
@@ -57,12 +61,12 @@ Skipping the preprocessor
 Twilidoc can save a copy of the preprocessed headers. The preprocessor is usually the longest task during the
 probe. You may save the headers using the option `--compile`, or `-c`:
 
-    ruby main.rb -i project.yml -o doc -c preprocessed_headers.hpp
+    twilidoc -i project.yml -o doc -c preprocessed_headers.hpp
 
 Then, if you update the documentation without having changed any headers, you can skip the preprocessor by
 using the option `--source`, or `-s`:
 
-    ruby main.rb -i project.yml -o doc -s preprocessed_headers.hpp
+    twilidoc -i project.yml -o doc -s preprocessed_headers.hpp
 
 Further Documentation
 ==

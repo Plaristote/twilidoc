@@ -1,7 +1,6 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
 @active_log = false
 @update_client = false
-$: << (File.expand_path (File.dirname __FILE__))
 
 require 'optparse'
 require 'fileutils'
@@ -28,10 +27,10 @@ ACTIVE_LOG = @active_log
 require 'yaml'
 CONF = YAML.load (File.open options[:input])
 require 'json'
-require 'twilidoc_string'
-require 'twilidoc_shell'
-require 'preprocessor'
-require 'parse'
+require 'twilidoc/string'
+require 'twilidoc/shell'
+require 'twilidoc/preprocessor'
+require 'twilidoc/parse'
 
 headers      = []
 descriptors  = []
@@ -229,7 +228,8 @@ project_json = { name: CONF['name'], desc: project_desc }
 json         = jsonify_object global_scope, [], project_json
 
 FileUtils.mkdir_p "#{options[:output]}/dist"
-asset_path = (File.dirname __FILE__) + "/charisma-doc"
+gemspec    = Gem::Specification.find_all_by_name("twilidoc").first
+asset_path = File.expand_path "#{gemspec.bin_dir}/../vendor"
 ["index.html", "dist/twilidoc.js", "dist/twilidoc.css"].each do |file|
   target = "#{options[:output]}/#{file}"
   if @update_client || !(File.exists? target)

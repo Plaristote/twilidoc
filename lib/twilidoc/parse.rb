@@ -1,5 +1,5 @@
-require 'twilidoc_string'
-require 'twilidoc_hash'
+require 'twilidoc/string'
+require 'twilidoc/hash'
 
 class ClassParser
   attr_accessor :expressions
