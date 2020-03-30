@@ -207,7 +207,7 @@ class ClassParser
 
       unless is_specialization
         member                    = evaluate visibility
-        member[0].template_params = template_params unless member.nil?
+        member[0].template_params = template_params unless member.nil? || member[0].nil?
         member
       else
         nil
@@ -386,12 +386,12 @@ class ClassParser
   def probe object = nil
     visibility = :public
     visibility = :private if (not object.nil?) and object.type == :class
-    puts 'Probing for expressions and scopes for object' + (if object.nil? then 'global scope' else object.name end) if ACTIVE_LOG == true
+    puts "Probing for expressions and scopes for object #{if object.nil? then 'global scope' else object.name end}" if ACTIVE_LOG == true
     until end_reached?
       next_word
       get_word
     end
-    puts 'Finish probind for expressions and scopes' if ACTIVE_LOG == true
+    puts 'Finish probing for expressions and scopes' if ACTIVE_LOG == true
     @expressions.each do |expression|
       item = expression.evaluate visibility
       if item.first.class == Object
