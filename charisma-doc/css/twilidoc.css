@@ -1,0 +1,37 @@
+#main-menu {
+  position: fixed;
+  width: 185px;
+  top: 75px;
+}
+
+#menu-search {
+  max-width: 145px;
+}
+
+.after-menu {
+  padding-left: 185px;
+  margin-right: -185px;
+}
+
+.sidebar-nav {
+  padding: 0 !important;
+}
+
+.box-header {
+  cursor: inherit;
+}
+
+.method-descriptor {
+  border-top: 1px dashed #988484;
+  padding-top: 10px;
+}
+
+div:first-of-type > div > div > .method-descriptor {
+  border: none;
+}
+
+.method-descriptor .box-params {
+  margin: 0 !important;
+  box-shadow: none;
+  -webkit-box-shadow: none;
+}

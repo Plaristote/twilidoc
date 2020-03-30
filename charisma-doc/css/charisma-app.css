@@ -343,7 +343,7 @@ margin-right:-2px;
 margin-left:-2px;
 }
 .brand{
-font-family: 'Shojumaru', cursive, Arial, serif; 
+font-family: cursive, Arial, serif; 
 letter-spacing:2px;
 text-shadow:1px 1px 5px rgba(0, 0, 0, 0.5);
 width:166px;
@@ -379,6 +379,7 @@ margin-bottom:0;
 .main-menu-span{
 	width:6.2% !important;
 	margin-right:4%;
+	position: fixed;
 }
 }
 
@@ -386,11 +387,13 @@ margin-bottom:0;
 margin-left:10px;
 }
 .navbar-inner{
-border-radius:0 0 10px 10px;
--webkit-border-radius:0 0 10px 10px;
--moz-border-radius:0 0 10px 10px;
 padding-top:5px; 
-padding-bottom:5px; 
+padding-bottom:5px;
+margin-bottom: 45px;
+width: 98%;
+position: fixed;
+z-index: 100;
+top: 0px;
 }
 div.dataTables_length select {
 width: 50px;
@@ -498,4 +501,7 @@ box-shadow: 0 0 10px #BDBDBD;
 }
 .box-content.buttons{
 min-height:297px;
+}
+.box-params,.method-name{
+font-family: "Lucida Console", Monaco, monospace;
 }

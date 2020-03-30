@@ -199,6 +199,7 @@ class Attribute
 ##
 class Member extends View
   constructor: (classname, type, element) ->
+    super()
     icon = ''
     icon = 'icon-cog'      if type == 'method'
     icon = 'icon-asterisk' if type == 'attribute'
@@ -214,7 +215,7 @@ class Member extends View
     @elem = $(html)
 
   AfterFilter: () ->
-    super
+    super()
     sh_highlightDocument()
   
   RenderMethod: (method, classname) ->
@@ -346,6 +347,7 @@ class Member extends View
 ##
 class Namespace extends View
   constructor: (namespace) ->
+    super()
     @view_type = 'namespace'
     types      = []
     for type in project.types
@@ -379,6 +381,7 @@ class Namespace extends View
 ##
 class Class extends View
   constructor: (classname) ->
+    super()
     @view_type = 'class'
     for type in project.types
       if type.name == classname
@@ -394,7 +397,6 @@ class Class extends View
 
     if @type.methods.length > 0
       html += Widget::Begin "Methods", "icon-cog"
-      html += "<div class='span12'></div>"
       for method in @type.methods
         html += "<div class='visibility-#{method.visibility}'>"
         html += Member::RenderMethod method, classname
@@ -403,7 +405,6 @@ class Class extends View
 
     if @type.attributes.length > 0
       html += Widget::Begin "Attributes", "icon-asterisk"
-      html += "<div class='span12'></div>"
       for attribute in @type.attributes
         html += "<div class='visibility-#{attribute.visibility}'>"
         html += Member::RenderAttribute attribute, classname
@@ -424,7 +425,7 @@ class Class extends View
     @elem = $(html)
     
   AfterFilter: () ->
-    super
+    super()
     sh_highlightDocument()
     window.uml.generate_hierarchy 'uml', @type.name
 
@@ -433,6 +434,7 @@ class Class extends View
 ##
 class ClassList extends View
   constructor: (object_types) ->
+    super()
     object_types = [ 'class', 'struct' ] unless object_types?
     title = if object_types.Includes 'class' then 'Class Index' else 'Namespace Index'
     html  = Widget::Begin title, 'icon-list'
@@ -487,6 +489,7 @@ class ClassList extends View
 
 class Homepage extends View
   constructor: () ->
+    super()
     html  = Widget::Begin "#{project.name}"
     html += project.desc.homepage
     html += Widget::End()
@@ -494,7 +497,7 @@ class Homepage extends View
     @elem = $(html)
     
   AfterFilter: () ->
-    super
+    super()
     sh_highlightDocument()
 
 ##
@@ -540,9 +543,9 @@ class Menu
     (height / entry) - 1
 
   SearchUpdate: () ->
-    regex = new RegExp (@search.attr 'value')
+    regex = new RegExp @search.val()
     @ClearResults()
-    return if (@search.attr 'value') == ''
+    return if @search.val() == ''
     res_count = 0
     max_count = @MaxElems()
     for type in project.types
@@ -797,4 +800,5 @@ $(document).ready ->
 
   window.anchor_handle.anchor = '#project'
   window.anchor_handle.Execute()
+  $(".project-name").text project.name
   console.log '[Twilidoc] Finished initializing'

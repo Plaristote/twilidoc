@@ -22,21 +22,13 @@ $(document).ready(function(){
 	}*/
 	
 	//ajax menu checkbox
+	/*
 	$('#is-ajax').click(function(e){
 		$.cookie('is-ajax',$(this).prop('checked'),{expires:365});
 	});
 	$('#is-ajax').prop('checked',$.cookie('is-ajax')==='true' ? true : false);
-	
-	//disbaling some functions for Internet Explorer
-	if($.browser.msie)
-	{
-		$('#is-ajax').prop('checked',false);
-		$('#for-is-ajax').hide();
-		$('#toggle-fullscreen').hide();
-		$('.login-box').find('.input-large').removeClass('span10');
-		
-	}
-	
+
+	*/
 	
 	//highlight current / active link
 	$('ul.main-menu li a').each(function(){
@@ -45,6 +37,7 @@ $(document).ready(function(){
 	});
 	
 	//establish history variables
+	/*
 	var
 		History = window.History, // Note: We are using a capital H instead of a lower h
 		State = History.getState(),
@@ -63,6 +56,7 @@ $(document).ready(function(){
 			}
 		});
 	});
+	*/
 	
 	//ajaxify menus
 	$('a.ajax-link').click(function(e){
@@ -101,24 +95,26 @@ function docReady(){
 	});
 	
 	//rich text editor
-	$('.cleditor').cleditor();
+	//$('.cleditor').cleditor();
 	
 	//datepicker
-	$('.datepicker').datepicker();
+	//$('.datepicker').datepicker();
 	
 	//notifications
+	/*
 	$('.noty').click(function(e){
 		e.preventDefault();
 		var options = $.parseJSON($(this).attr('data-noty-options'));
 		noty(options);
 	});
+	*/
 
 
 	//uniform - styler for checkbox, radio and file input
-	$("input:checkbox, input:radio, input:file").not('[data-no-uniform="true"],#uniform-is-ajax').uniform();
+	//$("input:checkbox, input:radio, input:file").not('[data-no-uniform="true"],#uniform-is-ajax').uniform();
 
 	//chosen - improves select
-	$('[data-rel="chosen"],[rel="chosen"]').chosen();
+	//$('[data-rel="chosen"],[rel="chosen"]').chosen();
 
 	//tabs
 	$('#myTab a:first').tab('show');
@@ -144,30 +140,36 @@ function docReady(){
 	$('[rel="tooltip"],[data-rel="tooltip"]').tooltip({"placement":"bottom",delay: { show: 400, hide: 200 }});
 
 	//auto grow textarea
-	$('textarea.autogrow').autogrow();
+	//$('textarea.autogrow').autogrow();
 
 	//popover
 	$('[rel="popover"],[data-rel="popover"]').popover();
 
 	//file manager
+	/*
 	var elf = $('.file-manager').elfinder({
 		url : 'misc/elfinder-connector/connector.php'  // connector URL (REQUIRED)
 	}).elfinder('instance');
+	*/
 
 	//iOS / iPhone style toggle switch
-	$('.iphone-toggle').iphoneStyle();
+	//$('.iphone-toggle').iphoneStyle();
 
 	//star rating
+	/*
 	$('.raty').raty({
 		score : 4 //default stars
 	});
+	*/
 
 	//uploadify - multiple uploads
+	/*
 	$('#file_upload').uploadify({
 		'swf'      : 'misc/uploadify.swf',
 		'uploader' : 'misc/uploadify.php'
 		// Put your options here
 	});
+	*/
 
 	//gallery controlls container animation
 	$('ul.gallery li').hover(function(){
@@ -309,6 +311,7 @@ function docReady(){
 
 
 	//initialize the calendar
+	/*
 	$('#calendar').fullCalendar({
 		header: {
 			left: 'prev,next today',
@@ -341,7 +344,7 @@ function docReady(){
 			
 		}
 	});
-	
+	*/
 	
 	//chart with points
 	if($("#sincos").length)
