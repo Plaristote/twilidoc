@@ -1,8 +1,10 @@
 #!/usr/bin/ruby
 @active_log = false
+@update_client = false
 $: << (File.expand_path (File.dirname __FILE__))
 
 require 'optparse'
+require 'fileutils'
 
 options = {
     output: 'doc',
@@ -17,6 +19,7 @@ OptionParser.new do |opts|
   opts.on '-s', '--source PATH', 'Use already compiled headers instead of compiling them' do |v| options[:source] = v end
   opts.on '-c', '--compile PATH', 'Output the compiled headers in a file' do |v| options[:compile_output] = v end
   opts.on '-d', '--debug', 'Enable the debug output' do |v| @active_log = true end
+  opts.on '-u', '--update-client', 'Override existing twilidoc html, js and css assets' do |v| @update_client = true end
   opts.on '-t', '--no-twilart', 'Disable the twilart' do |v| options[:twilart] = false end
 end.parse!
 
@@ -224,6 +227,15 @@ document_objects global_scope, project_desc
 project_desc = { homepage: CONF['description'] }
 project_json = { name: CONF['name'], desc: project_desc }
 json         = jsonify_object global_scope, [], project_json
+
+FileUtils.mkdir_p "#{options[:output]}/dist"
+asset_path = (File.dirname __FILE__) + "/charisma-doc"
+["index.html", "dist/twilidoc.js", "dist/twilidoc.css"].each do |file|
+  target = "#{options[:output]}/#{file}"
+  if @update_client || !(File.exists? target)
+    FileUtils.cp "#{asset_path}/#{file}", "#{target}"
+  end
+end
 
 File.open "#{options[:output]}/project.js", 'w' do |f|
   f.write 'var project = '
