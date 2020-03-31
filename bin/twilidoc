@@ -228,9 +228,10 @@ project_json = { name: CONF['name'], desc: project_desc }
 json         = jsonify_object global_scope, [], project_json
 
 FileUtils.mkdir_p "#{options[:output]}/dist"
+FileUtils.mkdir_p "#{options[:output]}/img"
 gemspec    = Gem::Specification.find_all_by_name("twilidoc").first
 asset_path = File.expand_path "#{gemspec.bin_dir}/../vendor"
-["index.html", "dist/twilidoc.js", "dist/twilidoc.css"].each do |file|
+["index.html", "dist/twilidoc.js", "dist/twilidoc.css", "img/glyphicons-halflings.png", "img/twilight-icon-2.png"].each do |file|
   target = "#{options[:output]}/#{file}"
   if @update_client || !(File.exists? target)
     FileUtils.cp "#{asset_path}/#{file}", "#{target}"

@@ -16,7 +16,9 @@ Gem::Specification.new do |s|
     "bin/twilidoc",
     "vendor/index.html",
     "vendor/dist/twilidoc.js",
-    "vendor/dist/twilidoc.css"
+    "vendor/dist/twilidoc.css",
+    "vendor/img/glyphicons-halflings.png",
+    "vendor/img/twilight-icon-2.png"
   ]
   s.executables << "twilidoc"
 end
