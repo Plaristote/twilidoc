@@ -24334,16 +24334,11 @@ uml.Class = Element.extend({
         }
         html += Widget.prototype.End();
       }
-      $.ajax({
-        url: `docs/${classname}.html`,
-        dataType: 'html',
-        async: false,
-        success: function(data) {
-          html += Widget.prototype.Begin("Documentation", "icon-file");
-          html += Attribute.prototype.Attribufy(data);
-          return html += Widget.prototype.End();
-        }
-      });
+      if (this.type.doc.detail != null) {
+        html += Widget.prototype.Begin("Documentation", "icon-file");
+        html += Attribute.prototype.Attribufy(this.type.doc.detail);
+        html += Widget.prototype.End();
+      }
       this.elem = $(html);
     }
 

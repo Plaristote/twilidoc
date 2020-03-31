@@ -424,15 +424,10 @@ class Class extends View
         obj_type = null
       html += Widget::End()
 
-    $.ajax {
-        url:      "docs/#{classname}.html",
-        dataType: 'html',
-        async:     false,
-        success: (data) ->
-          html += Widget::Begin "Documentation", "icon-file"
-          html += Attribute::Attribufy data
-          html += Widget::End()
-      }
+    if @type.doc.detail?
+      html += Widget::Begin "Documentation", "icon-file"
+      html += Attribute::Attribufy @type.doc.detail
+      html += Widget::End()
 
     @elem = $(html)
     

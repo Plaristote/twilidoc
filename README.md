@@ -44,6 +44,16 @@ The includes directories are searched recursively. You can also pair your header
 
     SomeClass:
       overview: 'A quick description showed in popovers'
+      detail: |
+        <h2>Complete HTML documentation for your class.</h2>
+        Types formatted as following: [SuchClass] will be replaced with buttons linking to the class' documentation.<br/>
+        You may also include excerpts of code using the preformatted element: we'll SHJS to highlight your code:<br/>
+        <pre>
+        void main()
+        {
+          return 0; // This code has colors.
+        }
+        </pre>
       methods:
         #N.B: The names are optional. Just describe the method in the order of declaration in the header
         - name:  'SomeMethod'
@@ -68,28 +78,7 @@ using the option `--source`, or `-s`:
 
     twilidoc -i project.yml -o doc -s preprocessed_headers.hpp
 
-Further Documentation
-==
-`Sadly, this feature is not supported for Opera and Chrome`
-You also have the possibility to write further documentation about a class by writing partial html files.
-They will be appended to the documentation of the object you wish to document.
-
-Everytime an object is loaded, Twilidoc will look for a 'docs/classname.html' file. For instance if your
-class is named `MyNamespace::MyClass`, Twilidoc will try to load `docs/MyNamespace::MyClass.html`.
-
-You may also use this feature to write samples of C++ code, which will automatically be provided with syntax
-coloration.
-Also note that writing `[MyNamespace::MyClass]` will create a link to the class' documentation.
-
 Caveats
 ==
-There might be some issues when commentaries and preprocessor code are met on the same lines.
-As far as I know everything else seems to be working fine.
-
-Feature Plan
-==
-+ Better UML widget
-+ Support for git
---> Display for users who worked on a file
---> Display timeline of a class by using the modifications times and change count from git
---> Find the buggiest parts by using 
+* There might be some issues when commentaries and preprocessor code are met on the same lines.
+* Template parameters are not clearly presented to the readers.
