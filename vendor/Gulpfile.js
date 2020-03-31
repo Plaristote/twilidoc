@@ -42,6 +42,7 @@ const jsSources = [
   "js/joint.dia.uml.js",
   // Twilidoc source
   "js/twilidoc-uml.js",
+  "js/twilidoc-params-morph.js",
   "js/twilidoc.js"
 ];
 

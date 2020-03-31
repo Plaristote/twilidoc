@@ -66,7 +66,6 @@ class Project
       name = (name.Split '<')[0]
     candidates = CandidatesFromType name, parent
     if candidates.length > 0
-      console.log candidates
       for type in project.types
         continue unless type.name?
         if candidates.Includes type.name
@@ -107,7 +106,6 @@ class View
       
   RefreshVisibility: () ->
     public_elems      = @elem.find '.visibility-public'
-    console.log public_elems
     protected_elems   = @elem.find '.visibility-protected'
     private_elems     = @elem.find '.visibility-private'
     if window.vision_handle.DisplayPublic()
@@ -150,12 +148,13 @@ class Widget
 class Attribute
   TypeBox: (name, attrs, type, is_typedef, name_only) ->
     html  = ''
-    html += "<p class='btn-group'>" unless name_only == true
+    html += "<p class='btn-group inline-btn-group'>"
     html +=   "<button class='btn btn-mini btn-info'>ptr</button>" if (attrs & ATTR_PTR)
     html +=   "<button class='btn btn-mini btn-info'>ref</button>" if (attrs & ATTR_REF)
     html +=   "<button class='btn btn-mini'>const</button>"        if (attrs & ATTR_CONST)
     html +=   "<button class='btn btn-mini'>unsigned</button>"     if (attrs & ATTR_UNSIGNED)
-    name        = (name.replace /</g, '[').replace />/g,']'
+    #name       = (name.replace /</g, '[').replace />/g,']'
+    name        = (name.replace /</g, '&lt;').replace />/g,'&gt;'
     if type? or is_typedef == true
       klass     = if is_typedef == true then 'btn-warning' else 'btn-success'
       html     += "<button class='btn btn-mini #{klass}'"
@@ -168,14 +167,17 @@ class Attribute
       html     += "data-rel='popover' data-content='#{desc}' title='#{classname}'"
       # End popover
       html += ">#{name}</button>"
+    else if name.match(/^std::/) != null
+      html     += "<button class='btn btn-mini btn-inverse' href=''>#{name}</button>"
     else
       html     += "<button class='btn btn-mini btn-inverse'>#{name}</button>"
-    html       += "</p>" unless name_only == true
+    html       += "</p>"
     html
     
   Attribufy: (html, classname) ->
-    html.replace /\[(((const|unsigned)\s*)*([a-z0-9_]+(::)?)*)\]/ig, (match, content, offset, s) ->
+    html.replace /\[(((const|unsigned)\s*)*([^\]]+)*)\][&*]?/ig, (match, content, offset, s) ->
       attrs = 0
+      content = "void" if content.length == 0
       while (content.match /^(const|unsigned)\s/)?
         if (content.substring 0, 5) == 'const'
           content = content.substring 6, content.length
@@ -185,6 +187,8 @@ class Attribute
           attrs  |= ATTR_UNSIGNED
         else
           break
+      attrs |= ATTR_REF if match.match(/&$/) != null
+      attrs |= ATTR_PTR if match.match(/\*$/) != null
       type = Project::GetType content, classname
       if type?
         html = Attribute::TypeBox content, attrs, type, false, true
@@ -192,7 +196,7 @@ class Attribute
         html = html.replace 'button>', 'a>'
         html
       else
-        match
+        Attribute::TypeBox content, attrs, type, false, true
 
 ##
 ## Single Element View
@@ -229,7 +233,6 @@ class Member extends View
       template_parts  = (name.Split '<')
       if template_parts.length > 1
         name          = template_parts[0]
-      console.log "Classname is: #{classname}!"
       return_type = Project::GetType name, classname
       #return_type = get_project_type method.return_type, classname
       if not return_type?
@@ -267,19 +270,22 @@ class Member extends View
     if method.attrs & ATTR_VIRTUAL
       visibility = '<span class="label label-inverse"><i class="icon-random"></i> Virtual</span> ' + visibility
 
-    params = method.params
-    params = params.replace /^\(\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)/ig, (match, content, offset, s) ->
-      match    = match.replace '(', '['
-      match   += ']'
-      '(' + match
-    params = params.replace /,\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)(\s*|,|)/ig, (match, content, offset, s) ->
-      ", [#{content}]"
+    params = method.params.replace /^\(/, ''
+    params =        params.replace /\)$/, ''
+    params = twilidoc_params_morph params
     params = Attribute::Attribufy params, classname
+    params = params.replace /<\/p>([^,)]*),?/ig, (match, content) ->
+      param_name_html = "</p>"
+      if content.length > 0
+        param_name_html += "<span class='parameter-name'>#{content}</span>"
+      if match.match(/,$/) != null
+        param_name_html += "<span class='parameter-separator'>,</span>"
+      param_name_html
 
     html += "</span>"
     html += "<div class='span9'>"
     html +=   "<span class='span3'><h4 class='method-name'>" + method.name + "</h4></span>"
-    html +=   "<span class='span6'><div class='box box-params'>" + params + "</div></span>"
+    html +=   "<span class='span6'><div class='box box-params method-params'>" + params + "</div></span>"
     html +=   "<span class='span3'><div style='float:right;'>#{visibility}</div></span>"
     html += "</div>"
     html += @RenderDoc method if method.doc?

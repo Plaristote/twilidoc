@@ -23585,6 +23585,7 @@ uml.Class = Element.extend({
       }
       position.x += width + 50;
       tmp = position.x;
+      console.log("UML Generating ancestors for", type);
       ref2 = type.ancestors;
       for (k = 0, len2 = ref2.length; k < len2; k++) {
         ancestor = ref2[k];
@@ -23618,6 +23619,125 @@ uml.Class = Element.extend({
     window.uml = {};
     return window.uml.generate_hierarchy = GenerateHierarchyUml;
   });
+
+}).call(this);
+
+(function() {
+  window.twilidoc_params_morph = function(params) {
+    var authorized_words, i, ii, j, len, opened_count, part, qualifiers, result, state, word;
+    state = 'typename';
+    result = "";
+    ii = 0;
+    while (ii < params.length) {
+      if (state === 'typename') {
+        result += '[';
+        while (ii === ' ' && ii < params.length) {
+          ii++;
+        }
+        i = ii;
+        authorized_words = ["const", "unsigned", "long"];
+        while (params[i] !== ' ' && params[i] !== ',' && i < params.length) {
+          for (j = 0, len = authorized_words.length; j < len; j++) {
+            word = authorized_words[j];
+            if (params.slice(i, i + word.length + 1) === word + ' ') {
+              i += word.length;
+              continue;
+            }
+          }
+          if (params[i] === '<') {
+            opened_count = 1;
+            i++;
+            while (i < params.length) {
+              if (params[i] === '<') {
+                opened_count += 1;
+              }
+              if (params[i] === '>') {
+                opened_count -= 1;
+              }
+              if (opened_count === 0) {
+                break;
+              }
+              i++;
+            }
+          }
+          if (params[i] === '(') {
+            opened_count = 1;
+            while (i < params.length) {
+              if (params[i] === '(') {
+                opened_count += 1;
+              }
+              if (params[i] === ')') {
+                opened_count -= 1;
+              }
+              if (opened_count === 0) {
+                break;
+              }
+              i++;
+            }
+          }
+          i++;
+        }
+        part = params.slice(ii, i);
+        qualifiers = part.match(/[&\*]$/);
+        if (qualifiers === null) {
+          result += part + ']';
+        } else {
+          result += part.slice(0, qualifiers.index) + ']' + qualifiers[0];
+        }
+        // Looking for & or * attached to the varname instead of the typename
+        if (params[i] === ' ') {
+          while (i < params.length && (params[i] === ' ' || params[i] === '&' || params[i] === '$')) {
+            if (params[i] === '&' || params[i] === '$') {
+              result += params[i];
+            }
+            i++;
+          }
+          result += ' ';
+        }
+        // If a coma is found right after the typename, next thing to parse is a typename
+        if (params[i] === ',') {
+          state = 'typename';
+        } else {
+          // Otherwise, next thing to parse is a varname
+          state = 'varname';
+          while (params[i] === ' ' && i < params.length) {
+            i++;
+          }
+        }
+        // Appending the last character and skipping it
+        if (params[i] === ',' || params[i] === ' ') {
+          result += params[i];
+          ii = i + 1;
+        } else {
+          ii = i;
+        }
+        while (params[ii] === ' ' && ii < params.length) {
+          // Skipping all the spaces until the next sign
+          ii++;
+        }
+      } else if (state === 'varname') {
+        while (ii < params.length && state === 'varname') {
+          if (params[ii] !== ',') {
+            result += params[ii];
+          } else {
+            result += ',';
+            state = 'typename';
+          }
+          ii++;
+        }
+        while (params[ii] === ' ' && ii < params.length) {
+          ii++;
+        }
+      } else {
+        console.warn("Failed to parse typename in", params);
+        break;
+      }
+    }
+    if (result === "") {
+      result = "[]";
+    }
+    return result;
+  };
 
 }).call(this);
 
@@ -23732,7 +23852,6 @@ uml.Class = Element.extend({
         }
         candidates = CandidatesFromType(name, parent);
         if (candidates.length > 0) {
-          console.log(candidates);
           ref = project.types;
           for (j = 0, len = ref.length; j < len; j++) {
             type = ref[j];
@@ -23804,7 +23923,6 @@ uml.Class = Element.extend({
     RefreshVisibility() {
       var private_elems, protected_elems, public_elems;
       public_elems = this.elem.find('.visibility-public');
-      console.log(public_elems);
       protected_elems = this.elem.find('.visibility-protected');
       private_elems = this.elem.find('.visibility-private');
       if (window.vision_handle.DisplayPublic()) {
@@ -23857,9 +23975,7 @@ uml.Class = Element.extend({
     TypeBox(name, attrs, type, is_typedef, name_only) {
       var classname, desc, html, klass;
       html = '';
-      if (name_only !== true) {
-        html += "<p class='btn-group'>";
-      }
+      html += "<p class='btn-group inline-btn-group'>";
       if (attrs & ATTR_PTR) {
         html += "<button class='btn btn-mini btn-info'>ptr</button>";
       }
@@ -23872,7 +23988,8 @@ uml.Class = Element.extend({
       if (attrs & ATTR_UNSIGNED) {
         html += "<button class='btn btn-mini'>unsigned</button>";
       }
-      name = (name.replace(/</g, '&gt;')).replace(/>/g, '&lt;');
+      //name       = (name.replace /</g, '[').replace />/g,']'
+      name = (name.replace(/</g, '&lt;')).replace(/>/g, '&gt;');
       if ((type != null) || is_typedef === true) {
         klass = is_typedef === true ? 'btn-warning' : 'btn-success';
         html += `<button class='btn btn-mini ${klass}'`;
@@ -23887,19 +24004,22 @@ uml.Class = Element.extend({
         html += `data-rel='popover' data-content='${desc}' title='${classname}'`;
         // End popover
         html += `>${name}</button>`;
+      } else if (name.match(/^std::/) !== null) {
+        html += `<button class='btn btn-mini btn-inverse' href=''>${name}</button>`;
       } else {
         html += `<button class='btn btn-mini btn-inverse'>${name}</button>`;
       }
-      if (name_only !== true) {
-        html += "</p>";
-      }
+      html += "</p>";
       return html;
     }
 
     Attribufy(html, classname) {
-      return html.replace(/\[(((const|unsigned)\s*)*([a-z0-9_]+(::)?)*)\]/ig, function(match, content, offset, s) {
+      return html.replace(/\[(((const|unsigned)\s*)*([^\]]+)*)\][&*]?/ig, function(match, content, offset, s) {
         var attrs, type;
         attrs = 0;
+        if (content.length === 0) {
+          content = "void";
+        }
         while ((content.match(/^(const|unsigned)\s/)) != null) {
           if ((content.substring(0, 5)) === 'const') {
             content = content.substring(6, content.length);
@@ -23911,6 +24031,12 @@ uml.Class = Element.extend({
             break;
           }
         }
+        if (match.match(/&$/) !== null) {
+          attrs |= ATTR_REF;
+        }
+        if (match.match(/\*$/) !== null) {
+          attrs |= ATTR_PTR;
+        }
         type = Project.prototype.GetType(content, classname);
         if (type != null) {
           html = Attribute.prototype.TypeBox(content, attrs, type, false, true);
@@ -23918,7 +24044,7 @@ uml.Class = Element.extend({
           html = html.replace('button>', 'a>');
           return html;
         } else {
-          return match;
+          return Attribute.prototype.TypeBox(content, attrs, type, false, true);
         }
       });
     }
@@ -23969,7 +24095,6 @@ uml.Class = Element.extend({
         if (template_parts.length > 1) {
           name = template_parts[0];
         }
-        console.log(`Classname is: ${classname}!`);
         return_type = Project.prototype.GetType(name, classname);
         //return_type = get_project_type method.return_type, classname
         if (return_type == null) {
@@ -24014,20 +24139,25 @@ uml.Class = Element.extend({
       if (method.attrs & ATTR_VIRTUAL) {
         visibility = '<span class="label label-inverse"><i class="icon-random"></i> Virtual</span> ' + visibility;
       }
-      params = method.params;
-      params = params.replace(/^\(\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)/ig, function(match, content, offset, s) {
-        match = match.replace('(', '[');
-        match += ']';
-        return '(' + match;
-      });
-      params = params.replace(/,\s*(((const|unsigned)\s*)*([a-z0-9_<>]+(::)?)*)(\s*|,|)/ig, function(match, content, offset, s) {
-        return `, [${content}]`;
-      });
+      params = method.params.replace(/^\(/, '');
+      params = params.replace(/\)$/, '');
+      params = twilidoc_params_morph(params);
       params = Attribute.prototype.Attribufy(params, classname);
+      params = params.replace(/<\/p>([^,)]*),?/ig, function(match, content) {
+        var param_name_html;
+        param_name_html = "</p>";
+        if (content.length > 0) {
+          param_name_html += `<span class='parameter-name'>${content}</span>`;
+        }
+        if (match.match(/,$/) !== null) {
+          param_name_html += "<span class='parameter-separator'>,</span>";
+        }
+        return param_name_html;
+      });
       html += "</span>";
       html += "<div class='span9'>";
       html += "<span class='span3'><h4 class='method-name'>" + method.name + "</h4></span>";
-      html += "<span class='span6'><div class='box box-params'>" + params + "</div></span>";
+      html += "<span class='span6'><div class='box box-params method-params'>" + params + "</div></span>";
       html += `<span class='span3'><div style='float:right;'>${visibility}</div></span>`;
       html += "</div>";
       if (method.doc != null) {
