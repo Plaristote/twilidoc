@@ -23568,6 +23568,9 @@ uml.Class = Element.extend({
         },
         interactive: false
       });
+      $(object.wrapper.node).on("click", function() {
+        return location.hash = `#show-class-${type.name}`;
+      });
       object.draggable(false);
       if (position.y + height + 10 > uml_height) {
         uml_height = position.y + height + 10;
@@ -23598,7 +23601,7 @@ uml.Class = Element.extend({
       if (klass !== null) {
         generate_uml(klass, 'public');
       } else {
-        alert("UML: Couldn't find type '" + classname + "'");
+        console.warn("UML: Couldn't find type '" + classname + "'");
       }
       return joint.setSize($('#' + id).parent().width(), uml_height);
     };

@@ -56,3 +56,11 @@ div:first-of-type > div > div > .method-descriptor {
 .method-params .parameter-separator {
   padding-right: 5px;
 }
+
+#uml tspan {
+  pointer-events: none;
+}
+
+#uml rect {
+  cursor: pointer;
+}

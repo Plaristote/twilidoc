@@ -8324,6 +8324,14 @@ div:first-of-type > div > div > .method-descriptor {
   padding-right: 5px;
 }
 
+#uml tspan {
+  pointer-events: none;
+}
+
+#uml rect {
+  cursor: pointer;
+}
+
 /*
 
 Uniform Theme: Uniform Default
