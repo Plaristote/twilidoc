@@ -74,21 +74,27 @@ class Project
 
   #private
   CandidatesFromType = (name, parent) ->
-    if parent? and name?
+    return [] if typeof name != "string" # maybe throw something here ?
+    if name? and name.match(/^::/)?
+      [ name.replace(/^::/, '') ]
+    else if parent? and name?
       parent     = new String parent
       parts      = parent.Split '::'
       candidates = []
-      for part in parts
-        merge    = (candidates.Join '::') + part
-        candidates.push merge
-      i          = 0
-      candidates[i++] += '::' + name while i < candidates.length
+      i = parts.length
+      while i > 0
+        candidate = parts[0...i].join('::') + '::' + name
+        candidates.push candidate
+        i--
       candidates.push name
       candidates
     else if name?
       [ name ]
     else
       []
+
+window.get_project_type = (name, parent) ->
+  Project::GetType name, parent
 
 class View
   AfterFilter: () ->

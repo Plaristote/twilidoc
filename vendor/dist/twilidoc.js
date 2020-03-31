@@ -23493,7 +23493,7 @@ uml.Class = Element.extend({
 })(this);	// END CLOSURE
 (function() {
   $(document).ready(function() {
-    var GenerateHierarchyUml, generate_uml, get_project_type, uml, uml_height, visibility_string2uml;
+    var GenerateHierarchyUml, generate_uml, uml, uml_height, visibility_string2uml;
     uml = Joint.dia.uml;
     uml_height = 0;
     visibility_string2uml = function(obj) {
@@ -23507,17 +23507,6 @@ uml.Class = Element.extend({
         default:
           return '?';
       }
-    };
-    get_project_type = function(name) {
-      var i, len, ref, type;
-      ref = project.types;
-      for (i = 0, len = ref.length; i < len; i++) {
-        type = ref[i];
-        if (type.name === name) {
-          return type;
-        }
-      }
-      return null;
     };
     generate_uml = function(type, visibility, start_pos) {
       var ancestor, ancestor_pos, ancestor_type, attribute, attributes, color, default_pos, height, i, inherits_object, j, k, len, len1, len2, method, methods, object, position, ref, ref1, ref2, str, tmp, tmp2, width;
@@ -23585,18 +23574,16 @@ uml.Class = Element.extend({
       }
       position.x += width + 50;
       tmp = position.x;
-      console.log("UML Generating ancestors for", type);
       ref2 = type.ancestors;
       for (k = 0, len2 = ref2.length; k < len2; k++) {
         ancestor = ref2[k];
-        ancestor_type = get_project_type(ancestor.name);
+        ancestor_type = get_project_type(ancestor.type, type.name);
         ancestor_pos = position;
         if (ancestor_type !== null) {
           tmp2 = position.y;
           inherits_object = generate_uml(ancestor_type, ancestor.visibility, ancestor_pos);
           position.y = tmp2;
           object.joint(inherits_object, uml.generalizationArrow);
-          console.log(inherits_object);
           position.x = tmp;
           position.y += inherits_object.getBBox().height + 10;
         }
@@ -23615,7 +23602,6 @@ uml.Class = Element.extend({
       }
       return joint.setSize($('#' + id).parent().width(), uml_height);
     };
-    window.get_project_type = get_project_type;
     window.uml = {};
     return window.uml.generate_hierarchy = GenerateHierarchyUml;
   });
@@ -23870,19 +23856,21 @@ uml.Class = Element.extend({
 
     //private
     CandidatesFromType = function(name, parent) {
-      var candidates, i, j, len, merge, part, parts;
-      if ((parent != null) && (name != null)) {
+      var candidate, candidates, i, parts;
+      if (typeof name !== "string") { // maybe throw something here ?
+        return [];
+      }
+      if ((name != null) && (name.match(/^::/) != null)) {
+        return [name.replace(/^::/, '')];
+      } else if ((parent != null) && (name != null)) {
         parent = new String(parent);
         parts = parent.Split('::');
         candidates = [];
-        for (j = 0, len = parts.length; j < len; j++) {
-          part = parts[j];
-          merge = (candidates.Join('::')) + part;
-          candidates.push(merge);
-        }
-        i = 0;
-        while (i < candidates.length) {
-          candidates[i++] += '::' + name;
+        i = parts.length;
+        while (i > 0) {
+          candidate = parts.slice(0, i).join('::') + '::' + name;
+          candidates.push(candidate);
+          i--;
         }
         candidates.push(name);
         return candidates;
@@ -23896,6 +23884,10 @@ uml.Class = Element.extend({
     return Project;
 
   }).call(this);
+
+  window.get_project_type = function(name, parent) {
+    return Project.prototype.GetType(name, parent);
+  };
 
   View = class View {
     AfterFilter() {

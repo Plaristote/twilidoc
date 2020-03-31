@@ -9,12 +9,6 @@ $(document).ready ->
       when 'private'   then '-'
       else                  '?'
 
-  get_project_type = (name) ->
-    for type in project.types
-      if type.name == name
-        return (type);
-    null
-
   generate_uml = (type, visibility, start_pos) ->
     color      = 'yellow'
     methods    = []
@@ -62,14 +56,13 @@ $(document).ready ->
     position.x += width + 50
     tmp         = position.x
     for ancestor in type.ancestors
-      ancestor_type = get_project_type(ancestor.name)
+      ancestor_type = get_project_type(ancestor.type, type.name)
       ancestor_pos  = position
       if ancestor_type != null
         tmp2            = position.y
         inherits_object = generate_uml ancestor_type, ancestor.visibility, ancestor_pos
         position.y      = tmp2
         object.joint inherits_object, uml.generalizationArrow
-        console.log(inherits_object);
         position.x  = tmp
         position.y += inherits_object.getBBox().height + 10
     return object
@@ -84,6 +77,5 @@ $(document).ready ->
       alert("UML: Couldn't find type '" + classname + "'");
     joint.setSize($('#' + id).parent().width(), uml_height);
 
-  window.get_project_type       = get_project_type
   window.uml                    = {}
   window.uml.generate_hierarchy = GenerateHierarchyUml
