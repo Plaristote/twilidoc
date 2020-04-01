@@ -57,7 +57,8 @@ class ClassParser
           if parts.size == 1
             return object[:item]
           else
-            return object[:item].solve_type (parts[1..parts.size].join '::')
+            result = object[:item].solve_type (parts[1..parts.size].join '::')
+            return result unless result.nil?
           end
         end
       end
