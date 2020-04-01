@@ -137,7 +137,7 @@ class View
         location.hash = $(@).attr 'data-route'
 
 class Widget
-  Begin: (title, icon, controls) ->
+  Begin: (title, icon, controls, content_class) ->
     "<div class='row-fluid sortable'>
         <div class='box span12'>
           <div class='box-header well' data-original-title>
@@ -146,7 +146,7 @@ class Widget
             " + (if controls? then controls else '') + "
             </div>
           </div>
-          <div class='box-content'>"
+          <div class='box-content #{content_class}'>"
           
   End: () ->
     "</div></div></div>"
@@ -298,7 +298,7 @@ class Member extends View
     html += "</div>"
     html += "</div>"
     html += "</div>"
-    html  = html.replace '<pre>', '<pre class="sh_cpp">'
+    html  = html.replace /<pre>/g, '<pre class="sh_cpp">'
     html
 
   RenderAttribute: (attribute, classname) ->
@@ -350,7 +350,7 @@ class Member extends View
       doc    += "<dt>Details</dt><dd>#{attribute.doc.desc}</dd>"   
       has_doc = true
     doc      += '</dl></div>'
-    doc       = doc.replace '<pre>', '<pre class="sh_cpp">'
+    doc       = doc.replace /<pre>/g, '<pre class="sh_cpp">'
     doc       = Attribute::Attribufy doc
     if has_doc then doc else ''
 
@@ -425,9 +425,10 @@ class Class extends View
       html += Widget::End()
 
     if @type.doc.detail?
-      html += Widget::Begin "Documentation", "icon-file"
+      html += Widget::Begin "Documentation", "icon-file", null, "widget-documentation"
       html += Attribute::Attribufy @type.doc.detail
       html += Widget::End()
+      html  = html.replace /<pre>/g, '<pre class="sh_cpp">'
 
     @elem = $(html)
     

@@ -23956,8 +23956,8 @@ uml.Class = Element.extend({
   };
 
   Widget = class Widget {
-    Begin(title, icon, controls) {
-      return "<div class='row-fluid sortable'> <div class='box span12'> <div class='box-header well' data-original-title> <h2>" + (icon != null ? "<i class='" + icon + "'></i>" : '') + ` ${title}</h2> <div class='box-icon'>` + (controls != null ? controls : '') + "</div> </div> <div class='box-content'>";
+    Begin(title, icon, controls, content_class) {
+      return "<div class='row-fluid sortable'> <div class='box span12'> <div class='box-header well' data-original-title> <h2>" + (icon != null ? "<i class='" + icon + "'></i>" : '') + ` ${title}</h2> <div class='box-icon'>` + (controls != null ? controls : '') + `</div> </div> <div class='box-content ${content_class}'>`;
     }
 
     End() {
@@ -24335,9 +24335,10 @@ uml.Class = Element.extend({
         html += Widget.prototype.End();
       }
       if (this.type.doc.detail != null) {
-        html += Widget.prototype.Begin("Documentation", "icon-file");
+        html += Widget.prototype.Begin("Documentation", "icon-file", null, "widget-documentation");
         html += Attribute.prototype.Attribufy(this.type.doc.detail);
         html += Widget.prototype.End();
+        html = html.replace(/<pre>/g, '<pre class="sh_cpp">');
       }
       this.elem = $(html);
     }
