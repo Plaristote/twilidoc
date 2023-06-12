@@ -5,80 +5,69 @@ Twilidoc is a documentatin generator for C++. It has two major objectives:
 - Non-intrusive documentation: no need to bloat your headers with annotations
 - Easy, pretty and dynamic web interface
 
-Twilidoc is composed of a Ruby script that probes C++ headers and generate a JSON object containing the description of your
-project.
-A Coffeescript application then use the JSON file to provide an easy to use interface to browse your project
-classes and display the corresponding documentation for classes and their methods/attributes.
+Twilidoc uses [libtwili](https://github.com/Plaristote/libtwili), a C++ header inspector based on libclang, to probe your project's header, and generates a description of your project in JSON format that can then be opened using the [twilidoc-reader](https://github.com/Plaristote/twilidoc-reader).
 
-This is still experimental. Many features will be implemented along the way, there are a few known issues, and probably
-a lot of unknown issues. Still, I've had it work perfectly with several projects including thousands of lines of code.
+All you need to do is add a simple configuration file giving general informations about your project: name, logo, some compiler option for libclang, and if you're generating documentation for a project made of several modules/packages, where each modules can be found.
+
+You may then add additional documentation for each of your classes, methods, functions using MarkDown documents: this gives you the possibility of writing more exhaustive documentations, with code examples and URLs, without having to annotate your headers so much that they become bloated with comments.
 
 What are you in for ?
 ==
-Well you can check out this url for a demonstration:
-http://fallout-equestria.googlecode.com/git/doc/blank.html
+Well, you can check out this url for a demonstration:
+https://crails-framework.github.io/api-reference/
 
-Howto
+The source files used to generate this documentation can be found there:
+https://github.com/crails-framework/api-reference
+
+Install
 ==
-Install the twilidoc gem
+If you do not have [build2](https://www.build2.org/) installed on your system, install it by following its [install guide](https://www.build2.org/install.xhtml).
 
-    gem install twilidoc
+Make sure libclang is also installed on your system.
 
-The ruby script from main.rb harvests data from your code to generate a json file describing your project:
+The following command will then clone the twilidoc repository and build it along with its dependencies:
 
-    twilidoc -i project.yml -o doc
+    git clone https://github.com/Plaristote/twilidoc.git
 
-The input file project.yml contains some configuration values about where to find your headers and other informations
-about your project.
-It looks like this:
+    bpkg create -d "build-gcc" cc config.cxx=g++
 
-    name: "Your project's name"
-    includes:
-      - "include_directory"
-      - "other_directory"
-    description: |
-      <h5>Homepage</h5>
-      Your project's homepage.
+    cd build-gcc
 
-The includes directories are searched recursively. You can also pair your headers with yml files to add further informations:
+    bpkg add --type dir ../twilidoc
+    bpkg fetch
+    bpkg build twilidoc '?sys:libclang/*'
 
-    SomeClass:
-      overview: 'A quick description showed in popovers'
-      detail: |
-        <h2>Complete HTML documentation for your class.</h2>
-        Types formatted as following: [SuchClass] will be replaced with buttons linking to the class' documentation.<br/>
-        You may also include excerpts of code using the preformatted element: we'll SHJS to highlight your code:<br/>
-        <pre>
-        void main()
-        {
-          return 0; // This code has colors.
-        }
-        </pre>
-      methods:
-        #N.B: The names are optional. Just describe the method in the order of declaration in the header
-        - name:  'SomeMethod'
-          short: 'A short description of the method'
-          desc:  'More details'
-      attributes:
-        - name:  'some_attribute'
-        - short: 'desc is not mandatory'
+You may then install twilidoc to your system using the following command:
 
-The output (option -o) for the main.rb script is the directory where you have copied the charisma-doc directory.
-That's all.
+    bpkg install twilidoc config.install.root=$INSTALL_DIRECTORY
 
-Skipping the preprocessor
-===
-Twilidoc can save a copy of the preprocessed headers. The preprocessor is usually the longest task during the
-probe. You may save the headers using the option `--compile`, or `-c`:
+Replacing $INSTALL_DIRECTORY with the name of the directory in which you want to perform the install (typically `/usr/local`, in which case you will also need to add the option `config.install.sudo=sudo`).
 
-    twilidoc -i project.yml -o doc -c preprocessed_headers.hpp
-
-Then, if you update the documentation without having changed any headers, you can skip the preprocessor by
-using the option `--source`, or `-s`:
-
-    twilidoc -i project.yml -o doc -s preprocessed_headers.hpp
-
-Caveats
+Usage
 ==
-* There might be some issues when commentaries and preprocessor code are met on the same lines.
-* Template parameters are not clearly presented to the readers.
+
+Create a `.twilidoc` file at the root of your project, such as:
+
+    {
+      "project": "My project name",
+      "inputs": ["./include"], // your include folders here
+      "cflags": [
+        "-std=c++17",
+        "-DTWILIDOC"
+      ]
+    }
+
+From the root of your project, you may then run the twilidoc compiler:
+
+    twilidoc -o doc -d doc-src
+
+- The `-d` option must point to the folder containing the MarkDown documents.
+- The `-o` option must point to the folder where you the final result will be generated.
+
+Once the command starts running, sit back and relax while twilidoc generates. If your project is big enough, it might take a while before the process completes.
+
+The command should generate a `twili.json` file in the folder specified with the `-o` option. This JSON file will be loaded by the twilidoc-reader, making it able to display your project's documentation. You may download a pre-built version of the reader in the [twilidoc-reader](https://github.com/Plaristote/twilidoc-reader/releases) repository:
+
+- extract the twilidoc-reader package in the `doc` folder
+- start a HTTP server in the `doc` folder
+- profit

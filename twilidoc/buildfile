@@ -1,0 +1,9 @@
+libs =
+import libs += libboost-json%lib{boost_json}
+import libs += libmd4c%lib{md4c}
+import libs += libmd4c-html%lib{md4c-html}
+import libs += libtwili%lib{twili}
+
+exe{twilidoc}: {hxx ixx txx cxx}{**} $libs
+
+cxx.poptions =+ "-I$out_root" "-I$src_root"

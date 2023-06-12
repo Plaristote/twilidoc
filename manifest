@@ -1,0 +1,13 @@
+: 1
+name: twilidoc
+version: 1.0.0
+summary: twilidoc C++ executable
+license: BSD-3-Clause
+description-file: README.md
+url: https://github.com/Plaristote/twilidoc
+email: michael@unetresgrossebite.com
+depends: * build2 >= 0.15.0
+depends: * bpkg >= 0.15.0
+depends: libtwili ^1.0.0
+depends: libboost-json >= 1.74.0
+depends: libmd4c ^0.4.8
