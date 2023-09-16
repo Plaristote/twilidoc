@@ -1,5 +1,6 @@
 #pragma once
 #include <set>
+#include <map>
 #include "options.hpp"
 
 struct PackageList
