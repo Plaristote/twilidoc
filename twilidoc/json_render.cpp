@@ -38,7 +38,9 @@ static std::string include_path_for(const MODEL& model, const boost::json::objec
 {
   if (metadata.if_contains("include"))
     return metadata.at("include").as_string().data() + model.include_path;
-  return model.include_path.substr(1);
+  if (model.include_path.length() > 0)
+    return model.include_path.substr(1);
+  return model.include_path;
 }
 
 static string json_key_value(const string& a, const string& b)
