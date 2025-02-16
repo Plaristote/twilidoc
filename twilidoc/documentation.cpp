@@ -191,19 +191,19 @@ static void load_package_doumentations(const std::string& doc_root, const std::s
 
 static void load_homepage(const std::string& doc_root, const std::string& output_root, TwiliParser& cpp)
 {
-  string homepage_name("/_home");
+  string homepage_name("/twilidoc_home");
   DocumentationContext context{cpp, homepage_name};
 
   if (get_documentation(doc_root, context).length() > 0)
   {
     cout << "- Homepage detected" << endl;
-    string twilidoc_path = output_root + "/docs/_home.html";
+    string twilidoc_path = output_root + "/docs/twilidoc_home.html";
     filesystem::create_directories(filesystem::path(twilidoc_path).parent_path());
     ofstream stream(twilidoc_path);
     stream << context.html;
   }
   else
-    cout << "- No homepage found (looked for " << doc_root << "/_home.md)" << endl;
+    cout << "- No homepage found (looked for " << doc_root << "/twilidoc_home.md)" << endl;
 }
 
 static void load_method_documentations(const ClassDefinition& klass, const Options& options, TwiliParser& cpp)
